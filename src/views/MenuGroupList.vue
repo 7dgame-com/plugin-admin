@@ -122,7 +122,7 @@ async function handleSubmit() {
     submitting.value = true
     try {
       if (editingId.value) {
-        const { data } = await updateMenuGroup({ id: editingId.value, ...form })
+        const { data } = await updateMenuGroup({ ...form, id: editingId.value })
         if (data.code === 0) { ElMessage.success('更新成功'); dialogVisible.value = false; loadData() }
         else ElMessage.error(data.message || '更新失败')
       } else {

@@ -178,7 +178,7 @@ async function handleSubmit() {
     submitting.value = true
     try {
       if (editingId.value) {
-        const { data } = await updatePermission({ id: editingId.value, ...form })
+        const { data } = await updatePermission({ ...form, id: editingId.value })
         if (data.code === 0) {
           ElMessage.success('更新成功')
           dialogVisible.value = false
