@@ -1,9 +1,9 @@
 <template>
   <div v-if="waiting" class="iframe-waiting">
-    <p>正在连接主系统...</p>
+    <p>{{ t('layout.connecting') }}</p>
   </div>
   <div v-else-if="!hasToken" class="iframe-waiting">
-    <p>请通过主系统访问</p>
+    <p>{{ t('layout.requireMainSystem') }}</p>
   </div>
   <router-view v-else />
 
@@ -13,12 +13,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { isInIframe, getToken, setToken, removeToken } from './utils/token'
 import { usePluginMessageBridge } from './composables/usePluginMessageBridge'
 import { setThemeFromConfig } from './composables/useTheme'
 
 declare const __APP_VERSION__: string
 const appVersion = `v${__APP_VERSION__}`
+const { t } = useI18n()
 
 const waiting = ref(false)
 const hasToken = ref(!!getToken())

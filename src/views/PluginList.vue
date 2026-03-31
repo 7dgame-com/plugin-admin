@@ -1,26 +1,26 @@
 <template>
   <div class="plugin-list">
     <div class="toolbar">
-      <el-button type="primary" @click="openCreateDialog">新增插件</el-button>
+      <el-button type="primary" @click="openCreateDialog">{{ t('plugin.addTitle') }}</el-button>
     </div>
 
     <el-card>
       <el-table :data="tableData" v-loading="loading" stripe>
-        <el-table-column prop="id" label="ID" width="160" />
-        <el-table-column prop="name" label="名称" min-width="120" />
-        <el-table-column prop="url" label="URL" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="group_id" label="所属分组" width="120" />
-        <el-table-column label="启用" width="80">
+        <el-table-column prop="id" :label="t('common.id')" width="160" />
+        <el-table-column prop="name" :label="t('common.name')" min-width="120" />
+        <el-table-column prop="url" :label="t('common.url')" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="group_id" :label="t('plugin.group')" width="120" />
+        <el-table-column :label="t('common.enabled')" width="80">
           <template #default="{ row }">
             <el-switch :model-value="!!row.enabled" disabled />
           </template>
         </el-table-column>
-        <el-table-column prop="domain" label="域名" width="160" show-overflow-tooltip />
-        <el-table-column prop="version" label="版本" width="100" />
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column prop="domain" :label="t('common.domain')" width="160" show-overflow-tooltip />
+        <el-table-column prop="version" :label="t('common.version')" width="100" />
+        <el-table-column :label="t('common.actions')" width="160" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button size="small" @click="openEditDialog(row)">{{ t('common.edit') }}</el-button>
+            <el-button size="small" type="danger" @click="handleDelete(row)">{{ t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -38,19 +38,19 @@
     </el-card>
 
     <!-- 新增/编辑对话框 -->
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑插件' : '新增插件'" width="600px">
+    <el-dialog v-model="dialogVisible" :title="editingId ? t('plugin.editTitle') : t('plugin.addTitle')" width="600px">
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
-        <el-form-item label="插件ID" prop="id">
-          <el-input v-model="form.id" placeholder="如: my-plugin" :disabled="!!editingId" />
+        <el-form-item :label="t('plugin.pluginId')" prop="id">
+          <el-input v-model="form.id" :placeholder="t('plugin.pluginIdPlaceholder')" :disabled="!!editingId" />
         </el-form-item>
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="form.name" placeholder="插件显示名称" />
+        <el-form-item :label="t('common.name')" prop="name">
+          <el-input v-model="form.name" :placeholder="t('plugin.namePlaceholder')" />
         </el-form-item>
-        <el-form-item label="URL" prop="url">
+        <el-form-item :label="t('common.url')" prop="url">
           <el-input v-model="form.url" placeholder="https://..." />
         </el-form-item>
-        <el-form-item label="所属分组">
-          <el-select v-model="form.group_id" placeholder="选择分组" clearable style="width: 100%">
+        <el-form-item :label="t('plugin.group')">
+          <el-select v-model="form.group_id" :placeholder="t('plugin.groupPlaceholder')" clearable style="width: 100%">
             <el-option
               v-for="g in menuGroups"
               :key="g.id"
@@ -59,31 +59,31 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="图标">
-          <el-input v-model="form.icon" placeholder="Element Plus 图标名" />
+        <el-form-item :label="t('common.icon')">
+          <el-input v-model="form.icon" :placeholder="t('plugin.iconPlaceholder')" />
         </el-form-item>
-        <el-form-item label="启用">
+        <el-form-item :label="t('common.enabled')">
           <el-switch v-model="form.enabled" />
         </el-form-item>
-        <el-form-item label="排序">
+        <el-form-item :label="t('common.order')">
           <el-input-number v-model="form.order" :min="0" />
         </el-form-item>
-        <el-form-item label="版本">
-          <el-input v-model="form.version" placeholder="1.0.0" />
+        <el-form-item :label="t('common.version')">
+          <el-input v-model="form.version" :placeholder="t('plugin.versionPlaceholder')" />
         </el-form-item>
-        <el-form-item label="域名">
-          <el-input v-model="form.domain" placeholder="绑定域名（留空为默认）" />
+        <el-form-item :label="t('common.domain')">
+          <el-input v-model="form.domain" :placeholder="t('plugin.domainPlaceholder')" />
         </el-form-item>
-        <el-form-item label="允许来源">
-          <el-input v-model="form.allowed_origin" placeholder="https://..." />
+        <el-form-item :label="t('plugin.allowedOrigin')">
+          <el-input v-model="form.allowed_origin" :placeholder="t('plugin.allowedOriginPlaceholder')" />
         </el-form-item>
-        <el-form-item label="描述">
+        <el-form-item :label="t('common.description')">
           <el-input v-model="form.description" type="textarea" :rows="2" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmit">确定</el-button>
+        <el-button @click="dialogVisible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="submitting" @click="handleSubmit">{{ t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -91,9 +91,12 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { getPlugins, createPlugin, updatePlugin, deletePlugin, getMenuGroups } from '../api'
+
+const { t } = useI18n()
 
 interface PluginItem {
   id: string
@@ -139,9 +142,9 @@ const form = reactive({
 })
 
 const rules: FormRules = {
-  id: [{ required: true, message: '请输入插件ID', trigger: 'blur' }],
-  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-  url: [{ required: true, message: '请输入URL', trigger: 'blur' }],
+  id: [{ required: true, message: () => t('plugin.messages.idRequired'), trigger: 'blur' }],
+  name: [{ required: true, message: () => t('plugin.messages.nameRequired'), trigger: 'blur' }],
+  url: [{ required: true, message: () => t('plugin.messages.urlRequired'), trigger: 'blur' }],
 }
 
 async function loadData() {
@@ -152,10 +155,10 @@ async function loadData() {
       tableData.value = data.data.items
       pagination.total = data.data.total
     } else {
-      ElMessage.error(data.message || '加载失败')
+      ElMessage.error(data.message || t('common.messages.loadFailed'))
     }
   } catch {
-    ElMessage.error('加载插件列表失败')
+    ElMessage.error(t('plugin.messages.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -203,15 +206,15 @@ async function handleSubmit() {
       const payload = { ...form, enabled: form.enabled ? 1 : 0 }
       if (editingId.value) {
         const { data } = await updatePlugin(payload)
-        if (data.code === 0) { ElMessage.success('更新成功'); dialogVisible.value = false; loadData() }
-        else ElMessage.error(data.message || '更新失败')
+        if (data.code === 0) { ElMessage.success(t('common.messages.updateSuccess')); dialogVisible.value = false; loadData() }
+        else ElMessage.error(data.message || t('common.messages.operationFailed'))
       } else {
         const { data } = await createPlugin(payload)
-        if (data.code === 0) { ElMessage.success('创建成功'); dialogVisible.value = false; loadData() }
-        else ElMessage.error(data.message || '创建失败')
+        if (data.code === 0) { ElMessage.success(t('common.messages.createSuccess')); dialogVisible.value = false; loadData() }
+        else ElMessage.error(data.message || t('common.messages.operationFailed'))
       }
     } catch {
-      ElMessage.error('操作失败')
+      ElMessage.error(t('common.messages.operationFailed'))
     } finally {
       submitting.value = false
     }
@@ -220,10 +223,10 @@ async function handleSubmit() {
 
 async function handleDelete(row: PluginItem) {
   try {
-    await ElMessageBox.confirm(`确定删除插件 "${row.name}"？`, '确认删除', { type: 'warning' })
+    await ElMessageBox.confirm(t('plugin.deleteConfirm', { name: row.name }), t('common.deleteConfirmTitle'), { type: 'warning' })
     const { data } = await deletePlugin(row.id)
-    if (data.code === 0) { ElMessage.success('删除成功'); loadData() }
-    else ElMessage.error(data.message || '删除失败')
+    if (data.code === 0) { ElMessage.success(t('common.messages.deleteSuccess')); loadData() }
+    else ElMessage.error(data.message || t('common.messages.operationFailed'))
   } catch {
     // 用户取消
   }

@@ -8,7 +8,7 @@
 
     <aside v-if="hasAny()" class="sidebar" :class="{ open: sidebarOpen }">
       <div class="sidebar-header">
-        <span class="sidebar-title">系统管理</span>
+        <span class="sidebar-title">{{ t('layout.title') }}</span>
         <button class="sidebar-close" @click="sidebarOpen = false">
           <el-icon><Close /></el-icon>
         </button>
@@ -22,7 +22,7 @@
           @click="sidebarOpen = false"
         >
           <el-icon><Key /></el-icon>
-          <span>插件权限管理</span>
+          <span>{{ t('permission.title') }}</span>
         </router-link>
         <router-link
           v-if="can('manage-plugins')"
@@ -32,7 +32,7 @@
           @click="sidebarOpen = false"
         >
           <el-icon><Grid /></el-icon>
-          <span>插件注册管理</span>
+          <span>{{ t('plugin.title') }}</span>
         </router-link>
         <router-link
           v-if="can('manage-plugins')"
@@ -42,7 +42,7 @@
           @click="sidebarOpen = false"
         >
           <el-icon><Menu /></el-icon>
-          <span>菜单分组管理</span>
+          <span>{{ t('menuGroup.title') }}</span>
         </router-link>
       </nav>
     </aside>
@@ -57,7 +57,7 @@
       </header>
       <main class="content">
         <div v-if="loaded && !hasAny()" class="no-permission">
-          <el-empty description="权限不足，请联系管理员配置" />
+          <el-empty :description="t('layout.noPermission')" />
         </div>
         <router-view v-else />
       </main>
@@ -67,9 +67,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Close, Fold, Key, Grid, Menu } from '@element-plus/icons-vue'
 import { usePermissions } from '../composables/usePermissions'
 
+const { t } = useI18n()
 const { fetchPermissions, can, hasAny, loaded } = usePermissions()
 
 const sidebarOpen = ref(false)

@@ -3,39 +3,39 @@
     <!-- 搜索表单 -->
     <el-card class="search-card">
       <el-form :model="searchForm" inline>
-        <el-form-item label="角色/权限">
-          <el-input v-model="searchForm.role_or_permission" placeholder="搜索角色或权限" clearable />
+        <el-form-item :label="t('permission.roleOrPermission')">
+          <el-input v-model="searchForm.role_or_permission" :placeholder="t('permission.searchRolePlaceholder')" clearable />
         </el-form-item>
-        <el-form-item label="插件标识">
-          <el-input v-model="searchForm.plugin_name" placeholder="搜索插件" clearable />
+        <el-form-item :label="t('permission.pluginName')">
+          <el-input v-model="searchForm.plugin_name" :placeholder="t('permission.searchPluginPlaceholder')" clearable />
         </el-form-item>
-        <el-form-item label="操作">
-          <el-input v-model="searchForm.action" placeholder="搜索操作" clearable />
+        <el-form-item :label="t('permission.action')">
+          <el-input v-model="searchForm.action" :placeholder="t('permission.searchActionPlaceholder')" clearable />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="loadData">搜索</el-button>
-          <el-button @click="resetSearch">重置</el-button>
+          <el-button type="primary" @click="loadData">{{ t('common.search') }}</el-button>
+          <el-button @click="resetSearch">{{ t('common.reset') }}</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
     <!-- 操作栏 -->
     <div class="toolbar">
-      <el-button type="primary" @click="openCreateDialog">新增权限配置</el-button>
+      <el-button type="primary" @click="openCreateDialog">{{ t('permission.addTitle') }}</el-button>
     </div>
 
     <!-- 表格 -->
     <el-card>
       <el-table :data="tableData" v-loading="loading" stripe>
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="role_or_permission" label="角色/权限名" min-width="150" />
-        <el-table-column prop="plugin_name" label="插件标识" min-width="150" />
-        <el-table-column prop="action" label="操作" min-width="150" />
-        <el-table-column prop="created_at" label="创建时间" width="180" />
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column prop="id" :label="t('common.id')" width="80" />
+        <el-table-column prop="role_or_permission" :label="t('permission.roleOrPermissionLabel')" min-width="150" />
+        <el-table-column prop="plugin_name" :label="t('permission.pluginName')" min-width="150" />
+        <el-table-column prop="action" :label="t('permission.action')" min-width="150" />
+        <el-table-column prop="created_at" :label="t('common.createdAt')" width="180" />
+        <el-table-column :label="t('common.actions')" width="160" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button size="small" @click="openEditDialog(row)">{{ t('common.edit') }}</el-button>
+            <el-button size="small" type="danger" @click="handleDelete(row)">{{ t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -53,21 +53,21 @@
     </el-card>
 
     <!-- 新增/编辑对话框 -->
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑权限配置' : '新增权限配置'" width="500px">
+    <el-dialog v-model="dialogVisible" :title="editingId ? t('permission.editTitle') : t('permission.addTitle')" width="500px">
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
-        <el-form-item label="角色/权限" prop="role_or_permission">
-          <el-input v-model="form.role_or_permission" placeholder="如: root, admin" />
+        <el-form-item :label="t('permission.roleOrPermission')" prop="role_or_permission">
+          <el-input v-model="form.role_or_permission" :placeholder="t('permission.rolePlaceholder')" />
         </el-form-item>
-        <el-form-item label="插件标识" prop="plugin_name">
-          <el-input v-model="form.plugin_name" placeholder="如: user-management" />
+        <el-form-item :label="t('permission.pluginName')" prop="plugin_name">
+          <el-input v-model="form.plugin_name" :placeholder="t('permission.pluginPlaceholder')" />
         </el-form-item>
-        <el-form-item label="操作" prop="action">
-          <el-input v-model="form.action" placeholder="如: manage-permissions" />
+        <el-form-item :label="t('permission.action')" prop="action">
+          <el-input v-model="form.action" :placeholder="t('permission.actionPlaceholder')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmit">确定</el-button>
+        <el-button @click="dialogVisible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="submitting" @click="handleSubmit">{{ t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -75,6 +75,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import {
@@ -83,6 +84,8 @@ import {
   updatePermission,
   deletePermission,
 } from '../api'
+
+const { t } = useI18n()
 
 interface PermissionItem {
   id: number
@@ -119,9 +122,9 @@ const form = reactive({
 })
 
 const rules: FormRules = {
-  role_or_permission: [{ required: true, message: '请输入角色/权限名', trigger: 'blur' }],
-  plugin_name: [{ required: true, message: '请输入插件标识', trigger: 'blur' }],
-  action: [{ required: true, message: '请输入操作', trigger: 'blur' }],
+  role_or_permission: [{ required: true, message: () => t('permission.messages.roleRequired'), trigger: 'blur' }],
+  plugin_name: [{ required: true, message: () => t('permission.messages.pluginRequired'), trigger: 'blur' }],
+  action: [{ required: true, message: () => t('permission.messages.actionRequired'), trigger: 'blur' }],
 }
 
 async function loadData() {
@@ -138,10 +141,10 @@ async function loadData() {
       tableData.value = data.data.items
       pagination.total = data.data.total
     } else {
-      ElMessage.error(data.message || '加载失败')
+      ElMessage.error(data.message || t('common.messages.loadFailed'))
     }
   } catch {
-    ElMessage.error('加载权限配置失败')
+    ElMessage.error(t('permission.messages.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -180,24 +183,24 @@ async function handleSubmit() {
       if (editingId.value) {
         const { data } = await updatePermission({ ...form, id: editingId.value })
         if (data.code === 0) {
-          ElMessage.success('更新成功')
+          ElMessage.success(t('common.messages.updateSuccess'))
           dialogVisible.value = false
           loadData()
         } else {
-          ElMessage.error(data.message || '更新失败')
+          ElMessage.error(data.message || t('common.messages.operationFailed'))
         }
       } else {
         const { data } = await createPermission(form)
         if (data.code === 0) {
-          ElMessage.success('创建成功')
+          ElMessage.success(t('common.messages.createSuccess'))
           dialogVisible.value = false
           loadData()
         } else {
-          ElMessage.error(data.message || '创建失败')
+          ElMessage.error(data.message || t('common.messages.operationFailed'))
         }
       }
     } catch {
-      ElMessage.error('操作失败')
+      ElMessage.error(t('common.messages.operationFailed'))
     } finally {
       submitting.value = false
     }
@@ -206,15 +209,17 @@ async function handleSubmit() {
 
 async function handleDelete(row: PermissionItem) {
   try {
-    await ElMessageBox.confirm(`确定删除权限配置 "${row.role_or_permission} / ${row.plugin_name} / ${row.action}"？`, '确认删除', {
-      type: 'warning',
-    })
+    await ElMessageBox.confirm(
+      t('permission.deleteConfirm', { role: row.role_or_permission, plugin: row.plugin_name, action: row.action }),
+      t('common.deleteConfirmTitle'),
+      { type: 'warning' }
+    )
     const { data } = await deletePermission(row.id)
     if (data.code === 0) {
-      ElMessage.success('删除成功')
+      ElMessage.success(t('common.messages.deleteSuccess'))
       loadData()
     } else {
-      ElMessage.error(data.message || '删除失败')
+      ElMessage.error(data.message || t('common.messages.operationFailed'))
     }
   } catch {
     // 用户取消

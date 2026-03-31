@@ -19,11 +19,12 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(buildVersion()),
   },
   server: {
-    port: 3004,
+    port: 3005,
     proxy: {
-      '/v1': {
+      '/api': {
         target: 'http://localhost:8081',
-        changeOrigin: true
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
       }
     }
   },

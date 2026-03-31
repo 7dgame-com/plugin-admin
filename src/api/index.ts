@@ -5,22 +5,24 @@ import {
   setToken,
   removeAllTokens,
   isInIframe,
-  requestParentTokenRefresh
+  requestParentTokenRefresh,
+  getRefreshToken,
+  setRefreshToken
 } from '../utils/token'
 
 /**
- * 管理接口（指向主后端 /v1/plugin-admin）
+ * 管理接口（指向主后端 /api/v1/plugin-admin）
  */
 const adminApi = axios.create({
-  baseURL: '/v1/plugin-admin',
+  baseURL: '/api/v1/plugin-admin',
   timeout: 10000
 })
 
 /**
- * 通用插件接口（指向主后端 /v1/plugin，如 verify-token、allowed-actions）
+ * 通用插件接口（指向主后端 /api/v1/plugin，如 verify-token、allowed-actions）
  */
 export const pluginApi = axios.create({
-  baseURL: '/v1/plugin',
+  baseURL: '/api/v1/plugin',
   timeout: 10000
 })
 
@@ -42,6 +44,28 @@ function processQueue(error: Error | null, token: string | null) {
   failedQueue = []
 }
 
+async function tryRefreshToken(): Promise<string | null> {
+  if (isInIframe()) {
+    const result = await requestParentTokenRefresh()
+    if (result?.accessToken) {
+      setToken(result.accessToken)
+      return result.accessToken
+    }
+    // parent timed out, fall through to local refresh
+  }
+  const refreshToken = getRefreshToken()
+  if (!refreshToken) return null
+  try {
+    const res = await axios.post('/api/auth/refresh', { refreshToken })
+    const { accessToken, refreshToken: newRefreshToken } = res.data
+    setToken(accessToken)
+    if (newRefreshToken) setRefreshToken(newRefreshToken)
+    return accessToken
+  } catch {
+    return null
+  }
+}
+
 /**
  * 为 axios 实例添加请求/响应拦截器
  */
@@ -53,9 +77,13 @@ function setupInterceptors(instance: ReturnType<typeof axios.create>) {
     return config
   })
 
-  // Response: 处理 401 刷新
+  // Response: 处理 x-refresh-token 和 401 刷新
   instance.interceptors.response.use(
-    (res) => res,
+    (res) => {
+      const rt = res.headers['x-refresh-token']
+      if (rt) setRefreshToken(rt)
+      return res
+    },
     async (err: AxiosError) => {
       const originalRequest = err.config as InternalAxiosRequestConfig & {
         _retry?: boolean
@@ -79,27 +107,19 @@ function setupInterceptors(instance: ReturnType<typeof axios.create>) {
       isRefreshing = true
 
       try {
-        let result: { accessToken: string } | null = null
+        const newToken = await tryRefreshToken()
 
-        if (isInIframe()) {
-          result = await requestParentTokenRefresh()
-        }
-
-        if (!result || !result.accessToken) {
+        if (!newToken) {
           throw new Error('Token refresh failed')
         }
 
-        setToken(result.accessToken)
-        processQueue(null, result.accessToken)
+        processQueue(null, newToken)
 
-        originalRequest.headers.Authorization = `Bearer ${result.accessToken}`
+        originalRequest.headers.Authorization = `Bearer ${newToken}`
         return instance(originalRequest)
       } catch (refreshError) {
         removeAllTokens()
-
-        if (isInIframe()) {
-          window.parent.postMessage({ type: 'TOKEN_EXPIRED' }, '*')
-        }
+        window.parent.postMessage({ type: 'TOKEN_EXPIRED' }, '*')
 
         processQueue(
           refreshError instanceof Error

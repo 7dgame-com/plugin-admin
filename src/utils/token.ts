@@ -1,4 +1,5 @@
 const TOKEN_KEY = 'system-admin-token'
+const REFRESH_TOKEN_KEY = 'system-admin-refresh-token'
 
 /** 是否在 iframe 中运行 */
 export function isInIframe(): boolean {
@@ -21,41 +22,21 @@ export function removeToken() {
   localStorage.removeItem(TOKEN_KEY)
 }
 
-export function removeAllTokens() {
-  removeToken()
+export function getRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_TOKEN_KEY)
 }
 
-/**
- * 监听主框架的 postMessage，接收 INIT 消息中的 token
- *
- * 握手顺序：调用时立即发送 PLUGIN_READY → 主系统收到后发送 INIT → 存储 token
- */
-export function listenForParentToken(callback: (token: string) => void) {
-  // 立即发送 PLUGIN_READY，通知主系统插件已就绪
-  window.parent.postMessage({
-    type: 'PLUGIN_READY',
-    id: `ready-${Date.now()}`
-  }, '*')
+export function setRefreshToken(token: string): void {
+  localStorage.setItem(REFRESH_TOKEN_KEY, token)
+}
 
-  window.addEventListener('message', (event) => {
-    if (event.source !== window.parent) return
+export function removeRefreshToken(): void {
+  localStorage.removeItem(REFRESH_TOKEN_KEY)
+}
 
-    const { type, payload } = event.data || {}
-
-    if (type === 'INIT' && payload?.token) {
-      setToken(payload.token)
-      callback(payload.token)
-    }
-
-    if (type === 'TOKEN_UPDATE' && payload?.token) {
-      setToken(payload.token)
-      callback(payload.token)
-    }
-
-    if (type === 'DESTROY') {
-      removeAllTokens()
-    }
-  })
+export function removeAllTokens() {
+  removeToken()
+  removeRefreshToken()
 }
 
 /**
