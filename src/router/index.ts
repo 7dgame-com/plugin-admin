@@ -11,6 +11,12 @@ const router = createRouter({
       meta: { title: '无法访问' }
     },
     {
+      path: '/api-diagnostics',
+      name: 'ApiDiagnostics',
+      component: () => import('../views/ApiDiagnostics.vue'),
+      meta: { title: 'API 诊断', public: true }
+    },
+    {
       path: '/',
       component: () => import('../layout/AppLayout.vue'),
       redirect: '/permissions',
@@ -39,6 +45,7 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
+  if (to.meta.public) return true
   if (to.name === 'NotAllowed') return true
   if (!isInIframe() || !getToken()) {
     return { name: 'NotAllowed' }
