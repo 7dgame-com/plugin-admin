@@ -78,7 +78,7 @@
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Close, Fold, Key, Grid, Menu, User, Loading } from '@element-plus/icons-vue'
-import api from '../api'
+import api, { pluginApi } from '../api'
 import { usePermissions } from '../composables/usePermissions'
 
 const { t } = useI18n()
@@ -91,10 +91,12 @@ const ready = ref(false)
 onMounted(async () => {
   try {
     const [{ data }] = await Promise.all([
-      api.get('/me'),
+      pluginApi.get('/verify-token'),
       fetchPermissions(),
     ])
-    userInfo.value = data
+    if (data.code === 0) {
+      userInfo.value = data.data
+    }
   } catch {
     // 静默失败，不影响页面使用
   } finally {
