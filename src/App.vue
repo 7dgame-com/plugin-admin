@@ -72,7 +72,10 @@ onMounted(() => {
     removeToken()
     hasToken.value = false
   } else {
-    hasToken.value = !!getToken()
+    // iframe 内不复用旧 token，始终等待 INIT 握手获取新 token
+    // 旧 token 可能因 DESTROY 未及时清除而残留且已过期
+    removeToken()
+    hasToken.value = false
   }
 })
 </script>
