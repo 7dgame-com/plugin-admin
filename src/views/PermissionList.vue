@@ -143,8 +143,12 @@ async function loadData() {
     } else {
       ElMessage.error(data.message || t('common.messages.loadFailed'))
     }
-  } catch {
-    ElMessage.error(t('permission.messages.loadFailed'))
+  } catch (err: any) {
+    // 401/403 由 axios 拦截器处理 token 刷新，不弹错误提示
+    const status = err?.response?.status
+    if (status !== 401 && status !== 403) {
+      ElMessage.error(t('permission.messages.loadFailed'))
+    }
   } finally {
     loading.value = false
   }

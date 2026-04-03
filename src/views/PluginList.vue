@@ -157,8 +157,11 @@ async function loadData() {
     } else {
       ElMessage.error(data.message || t('common.messages.loadFailed'))
     }
-  } catch {
-    ElMessage.error(t('plugin.messages.loadFailed'))
+  } catch (err: any) {
+    const status = err?.response?.status
+    if (status !== 401 && status !== 403) {
+      ElMessage.error(t('plugin.messages.loadFailed'))
+    }
   } finally {
     loading.value = false
   }
