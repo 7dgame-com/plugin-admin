@@ -61,7 +61,11 @@
         </div>
       </header>
       <main class="content">
-        <div v-if="loaded && !hasAny()" class="no-permission">
+        <!-- 等待权限和用户信息加载完成 -->
+        <div v-if="!ready" class="loading-state">
+          <el-icon class="is-loading" :size="24"><Loading /></el-icon>
+        </div>
+        <div v-else-if="loaded && !hasAny()" class="no-permission">
           <el-empty :description="t('layout.noPermission')" />
         </div>
         <router-view v-else />
@@ -73,7 +77,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Close, Fold, Key, Grid, Menu, User } from '@element-plus/icons-vue'
+import { Close, Fold, Key, Grid, Menu, User, Loading } from '@element-plus/icons-vue'
 import api from '../api'
 import { usePermissions } from '../composables/usePermissions'
 
@@ -82,6 +86,7 @@ const { fetchPermissions, can, hasAny, loaded } = usePermissions()
 
 const sidebarOpen = ref(false)
 const userInfo = ref<{ username: string; nickname?: string; roles: string[] } | null>(null)
+const ready = ref(false)
 
 onMounted(async () => {
   try {
@@ -92,6 +97,8 @@ onMounted(async () => {
     userInfo.value = data
   } catch {
     // 静默失败，不影响页面使用
+  } finally {
+    ready.value = true
   }
 })
 </script>
@@ -239,5 +246,13 @@ onMounted(async () => {
 
 .content {
   padding: var(--spacing-lg);
+}
+
+.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-muted);
 }
 </style>
