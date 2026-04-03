@@ -54,6 +54,11 @@
         </button>
         <h1 class="navbar-title">{{ $route.meta.title || '系统管理' }}</h1>
         <div class="navbar-spacer" />
+        <div v-if="userInfo" class="user-info">
+          <el-icon><User /></el-icon>
+          <span>{{ userInfo.nickname || userInfo.username }}</span>
+          <el-tag size="small" v-for="role in userInfo.roles" :key="role">{{ role }}</el-tag>
+        </div>
       </header>
       <main class="content">
         <div v-if="loaded && !hasAny()" class="no-permission">
@@ -68,7 +73,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Close, Fold, Key, Grid, Menu } from '@element-plus/icons-vue'
+import { Close, Fold, Key, Grid, Menu, User } from '@element-plus/icons-vue'
+import api from '../api'
 import { usePermissions } from '../composables/usePermissions'
 
 const { t } = useI18n()
@@ -78,7 +84,15 @@ const sidebarOpen = ref(false)
 const userInfo = ref<{ username: string; nickname?: string; roles: string[] } | null>(null)
 
 onMounted(async () => {
-  await fetchPermissions()
+  try {
+    const [{ data }] = await Promise.all([
+      api.get('/me'),
+      fetchPermissions(),
+    ])
+    userInfo.value = data
+  } catch {
+    // 静默失败，不影响页面使用
+  }
 })
 </script>
 

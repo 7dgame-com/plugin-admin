@@ -1,15 +1,19 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { isInIframe, getToken } from '../utils/token'
+import { ElMessage } from 'element-plus'
+import { usePermissions } from '../composables/usePermissions'
+import i18n from '../i18n'
+
+declare module 'vue-router' {
+  interface RouteMeta {
+    title?: string
+    public?: boolean
+    requiresPermission?: string
+  }
+}
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    {
-      path: '/not-allowed',
-      name: 'NotAllowed',
-      component: () => import('../views/NotAllowed.vue'),
-      meta: { title: '无法访问' }
-    },
     {
       path: '/api-diagnostics',
       name: 'ApiDiagnostics',
@@ -25,32 +29,50 @@ const router = createRouter({
           path: 'permissions',
           name: 'PermissionList',
           component: () => import('../views/PermissionList.vue'),
-          meta: { title: '插件权限管理', action: 'manage-permissions' }
+          meta: { title: '插件权限管理', requiresPermission: 'manage-permissions' }
         },
         {
           path: 'plugins',
           name: 'PluginList',
           component: () => import('../views/PluginList.vue'),
-          meta: { title: '插件注册管理', action: 'manage-plugins' }
+          meta: { title: '插件注册管理', requiresPermission: 'manage-plugins' }
         },
         {
           path: 'menu-groups',
           name: 'MenuGroupList',
           component: () => import('../views/MenuGroupList.vue'),
-          meta: { title: '菜单分组管理', action: 'manage-plugins' }
+          meta: { title: '菜单分组管理', requiresPermission: 'manage-plugins' }
         },
       ]
     }
   ]
 })
 
-router.beforeEach((to) => {
+export function permissionGuard(
+  to: { meta: { public?: boolean; requiresPermission?: string } },
+  from: { name?: string | symbol | null | undefined }
+): boolean | string {
   if (to.meta.public) return true
-  if (to.name === 'NotAllowed') return true
-  if (!isInIframe() || !getToken()) {
-    return { name: 'NotAllowed' }
+
+  const requiredPermission = to.meta.requiresPermission
+  if (!requiredPermission) return true
+
+  try {
+    const { can } = usePermissions()
+    if (can(requiredPermission as Parameters<typeof can>[0])) {
+      return true
+    }
+    // 首次导航（from.name 为空）时直接放行，避免重定向回 '/' 产生无限循环
+    if (!from.name) return true
+    ElMessage.error(i18n.global.t('layout.permissionDenied'))
+    return false
+  } catch {
+    ElMessage.error(i18n.global.t('layout.permissionCheckFailed'))
+    if (!from.name) return true
+    return false
   }
-  return true
-})
+}
+
+router.beforeEach(permissionGuard)
 
 export default router

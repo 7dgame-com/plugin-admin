@@ -1,8 +1,11 @@
 import { createI18n } from 'vue-i18n'
 import zhCN from './locales/zh-CN'
+import zhTW from './locales/zh-TW'
 import enUS from './locales/en-US'
+import jaJP from './locales/ja-JP'
+import thTH from './locales/th-TH'
 
-const SUPPORTED_LOCALES = ['zh-CN', 'en-US'] as const
+const SUPPORTED_LOCALES = ['zh-CN', 'zh-TW', 'en-US', 'ja-JP', 'th-TH'] as const
 type SupportedLocale = (typeof SUPPORTED_LOCALES)[number]
 
 function getLanguageFromURL(): SupportedLocale {
@@ -20,7 +23,10 @@ const i18n = createI18n({
   fallbackLocale: 'zh-CN',
   messages: {
     'zh-CN': zhCN,
+    'zh-TW': zhTW,
     'en-US': enUS,
+    'ja-JP': jaJP,
+    'th-TH': thTH,
   },
 })
 

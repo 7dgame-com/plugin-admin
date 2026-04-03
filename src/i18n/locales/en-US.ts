@@ -39,6 +39,8 @@ export default {
     connecting: 'Connecting to main system...',
     requireMainSystem: 'Please access via the main system',
     noPermission: 'Insufficient permissions, please contact your administrator',
+    permissionDenied: 'You do not have permission to access this page',
+    permissionCheckFailed: 'Permission check failed, please try again later',
   },
   permission: {
     title: 'Plugin Permission Management',

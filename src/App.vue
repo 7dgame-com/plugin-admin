@@ -4,29 +4,20 @@
   <template v-else>
     <router-view v-if="hasToken" />
 
+    <!-- 握手状态（半透明遮罩） -->
     <Transition name="handshake-fade">
-      <div v-if="showHandshake" class="handshake-overlay">
+      <!-- 非 iframe：警告模态窗 -->
+      <div v-if="showHandshake && !inIframe" key="warning" class="handshake-overlay">
         <div class="handshake-card">
-          <template v-if="!inIframe">
-            <div class="handshake-icon">⚠️</div>
-            <h3 class="handshake-title">{{ t('layout.requireMainSystem') }}</h3>
-            <a href="/api-diagnostics" class="diag-link">前往 API 诊断页面 →</a>
-          </template>
-          <template v-else>
-            <div class="handshake-icon spin">⚙️</div>
-            <h3 class="handshake-title">{{ t('layout.connecting') }}</h3>
-            <div class="handshake-steps">
-              <div class="step done">✅ 页面加载完成</div>
-              <div class="step done">✅ 发送 PLUGIN_READY</div>
-              <div class="step" :class="isReady ? 'done' : 'waiting'">
-                {{ isReady ? '✅' : '⏳' }} 等待主系统回复 INIT
-              </div>
-              <div class="step" :class="hasToken ? 'done' : 'waiting'">
-                {{ hasToken ? '✅' : '⏳' }} 获取 JWT Token
-              </div>
-            </div>
-          </template>
+          <div class="handshake-icon warn">⚠️</div>
+          <h3 class="handshake-title">{{ t('layout.requireMainSystem') }}</h3>
+          <a href="/api-diagnostics" class="diag-link">API Diagnostics →</a>
         </div>
+      </div>
+      <!-- iframe 内：简单 loading -->
+      <div v-else-if="showHandshake && inIframe" key="loading" class="handshake-inline">
+        <div class="handshake-spinner spin">⚙️</div>
+        <p class="handshake-text">{{ t('layout.connecting') }}</p>
       </div>
     </Transition>
   </template>
@@ -48,7 +39,7 @@ const { t } = useI18n()
 
 const route = useRoute()
 const hasToken = ref(!!getToken())
-const inIframe = ref(false)
+const inIframe = ref(isInIframe())
 
 const PUBLIC_ROUTES = ['/api-diagnostics']
 const isPublicRoute = computed(() => PUBLIC_ROUTES.some((p) => route.path.startsWith(p)))
@@ -63,7 +54,10 @@ const { isReady } = usePluginMessageBridge({
     setThemeFromConfig(payload.config)
   },
   onTokenUpdate: (newToken) => {
-    if (newToken) setToken(newToken)
+    if (newToken) {
+      setToken(newToken)
+      hasToken.value = true
+    }
   },
   onDestroy: () => {
     removeToken()
@@ -103,11 +97,8 @@ onMounted(() => {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
   text-align: center;
 }
-.handshake-icon { font-size: 40px; margin-bottom: 12px; }
-.handshake-icon.spin {
-  display: inline-block;
-  animation: spin 2s linear infinite;
-}
+.handshake-icon { font-size: 40px; margin-bottom: 12px; line-height: 1; }
+.handshake-icon.spin { display: inline-block; animation: spin 2s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .handshake-title { margin: 0 0 8px; font-size: 18px; color: #303133; }
 .handshake-steps {
@@ -123,8 +114,21 @@ onMounted(() => {
 .step { font-size: 13px; color: #606266; }
 .step.done { color: #67c23a; }
 .step.waiting { color: #909399; }
+.step.warn { color: #e6a23c; }
 .diag-link { font-size: 13px; color: #409eff; text-decoration: none; display: block; margin-top: 16px; }
 .diag-link:hover { text-decoration: underline; }
+.handshake-inline {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-page, #f5f7fa);
+}
+.handshake-spinner { font-size: 36px; display: inline-block; }
+.handshake-spinner.spin { animation: spin 2s linear infinite; }
+.handshake-text { margin-top: 12px; font-size: 14px; color: #909399; }
 .handshake-fade-enter-active, .handshake-fade-leave-active { transition: opacity 0.4s ease; }
 .handshake-fade-enter-from, .handshake-fade-leave-to { opacity: 0; }
 .global-version {

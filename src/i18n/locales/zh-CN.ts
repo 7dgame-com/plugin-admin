@@ -39,6 +39,8 @@ export default {
     connecting: '正在连接主系统...',
     requireMainSystem: '请通过主系统访问',
     noPermission: '权限不足，请联系管理员配置',
+    permissionDenied: '您没有权限访问此页面',
+    permissionCheckFailed: '权限验证失败，请稍后重试',
   },
   permission: {
     title: '插件权限管理',
