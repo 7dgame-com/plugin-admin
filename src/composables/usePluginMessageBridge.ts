@@ -174,7 +174,10 @@ export function usePluginMessageBridge(
 
   onMounted(() => {
     window.addEventListener('message', handleMessage)
-    postMessage('PLUGIN_READY')
+    if (!(window as Record<string, unknown>).__PLUGIN_READY_SENT__) {
+      ;(window as Record<string, unknown>).__PLUGIN_READY_SENT__ = true
+      postMessage('PLUGIN_READY')
+    }
   })
 
   onBeforeUnmount(() => {
