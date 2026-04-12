@@ -48,6 +48,85 @@
       </div>
     </div>
 
+    <!-- 后端诊断 -->
+    <div class="section">
+      <div class="section-header">
+        <h3>后端诊断</h3>
+        <el-button type="primary" size="small" :loading="backendDiagnosticsLoading" @click="loadBackendDiagnostics">刷新诊断</el-button>
+      </div>
+      <p class="hint">由 system-admin/backend 服务端执行主后端、数据库与配置检查，前端只负责展示结果。</p>
+      <div v-if="backendDiagnosticsError" class="error-msg">❌ {{ backendDiagnosticsError }}</div>
+      <div v-if="backendDiagnostics" class="backend-diagnostics">
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="label">总体状态</span>
+            <el-tag :type="getDiagTagType(backendDiagnostics.status)" size="small">{{ getDiagStatusText(backendDiagnostics.status) }}</el-tag>
+          </div>
+          <div class="info-item">
+            <span class="label">生成时间</span>
+            <code>{{ formatGeneratedAt(backendDiagnostics.generated_at) }}</code>
+          </div>
+          <div class="info-item">
+            <span class="label">服务名</span>
+            <code>{{ backendDiagnostics.service.name }}</code>
+          </div>
+          <div class="info-item">
+            <span class="label">监听端口</span>
+            <code>{{ backendDiagnostics.service.port }}</code>
+          </div>
+          <div class="info-item">
+            <span class="label">运行环境</span>
+            <code>{{ backendDiagnostics.service.node_env }}</code>
+          </div>
+          <div class="info-item">
+            <span class="label">运行时长</span>
+            <code>{{ formatUptime(backendDiagnostics.service.uptime_seconds) }}</code>
+          </div>
+        </div>
+
+        <el-table :data="backendCheckRows" stripe border style="margin-top: 12px">
+          <el-table-column prop="label" label="检查项" width="220" />
+          <el-table-column label="目标" min-width="280">
+            <template #default="{ row }"><code class="url">{{ row.target }}</code></template>
+          </el-table-column>
+          <el-table-column label="状态" width="140">
+            <template #default="{ row }">
+              <el-tag :type="getDiagTagType(row.status)" size="small">{{ getDiagStatusText(row.status) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="HTTP" width="100">
+            <template #default="{ row }">{{ row.http_status ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column label="耗时" width="100">
+            <template #default="{ row }">{{ row.latency_ms }}ms</template>
+          </el-table-column>
+          <el-table-column label="说明" min-width="320">
+            <template #default="{ row }">
+              <div v-if="row.note" class="status-note">{{ row.note }}</div>
+              <div v-if="row.error" class="error-msg">❌ {{ row.error }}</div>
+              <div v-if="!row.note && !row.error">-</div>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <el-table :data="backendConfigRows" stripe border style="margin-top: 12px">
+          <el-table-column prop="key" label="配置项" width="240" />
+          <el-table-column label="值" min-width="260">
+            <template #default="{ row }"><code class="url">{{ row.value }}</code></template>
+          </el-table-column>
+          <el-table-column label="状态" width="140">
+            <template #default="{ row }">
+              <el-tag :type="getDiagTagType(row.status)" size="small">{{ getDiagStatusText(row.status) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="备注" min-width="280">
+            <template #default="{ row }">{{ row.note || '-' }}</template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <div v-else-if="backendDiagnosticsLoading" class="hint">正在加载后端诊断结果...</div>
+    </div>
+
     <!-- 反向代理连通性检测 -->
     <div class="section">
       <h3>反向代理连通性检测</h3>
@@ -190,9 +269,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { computed, ref, reactive, onMounted } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import adminApi, { pluginApi } from '../api'
+import {
+  fetchBackendDiagnostics,
+  type BackendDiagnosticsCheck,
+  type BackendDiagnosticsConfigItem,
+  type BackendDiagnosticsData,
+  type BackendDiagnosticsStatus,
+} from '../api/backendDiagnostics'
 import { getToken, isInIframe } from '../utils/token'
 
 // ---- 环境信息 ----
@@ -207,6 +293,71 @@ const envInfo = reactive({
   hostname: '',
   serverBuildTime: '',
 })
+
+const backendDiagnostics = ref<BackendDiagnosticsData | null>(null)
+const backendDiagnosticsLoading = ref(false)
+const backendDiagnosticsError = ref('')
+
+const backendCheckLabels: Record<string, string> = {
+  main_backend_health: '主后端 /health',
+  main_backend_verify_token: '主后端 /v1/plugin/verify-token',
+  plugin_db: '插件数据库',
+}
+
+const backendCheckRows = computed(() => {
+  if (!backendDiagnostics.value) return []
+  return Object.entries(backendDiagnostics.value.checks).map(([key, value]) => ({
+    key,
+    label: backendCheckLabels[key] || key,
+    ...(value as BackendDiagnosticsCheck),
+  }))
+})
+
+const backendConfigRows = computed(() => {
+  if (!backendDiagnostics.value) return []
+  return Object.entries(backendDiagnostics.value.config).map(([key, value]) => ({
+    key,
+    ...(value as BackendDiagnosticsConfigItem),
+  }))
+})
+
+function getDiagTagType(status: BackendDiagnosticsStatus | 'warning' | 'error') {
+  if (status === 'ok') return 'success'
+  if (status === 'reachable' || status === 'warning') return 'warning'
+  return 'danger'
+}
+
+function getDiagStatusText(status: BackendDiagnosticsStatus | 'warning' | 'error') {
+  if (status === 'ok') return '正常'
+  if (status === 'reachable') return '可达'
+  if (status === 'warning') return '告警'
+  return '异常'
+}
+
+function formatGeneratedAt(value: string) {
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString()
+}
+
+function formatUptime(seconds: number) {
+  if (seconds < 60) return `${seconds}s`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  return `${hours}h ${minutes}m`
+}
+
+async function loadBackendDiagnostics() {
+  backendDiagnosticsLoading.value = true
+  backendDiagnosticsError.value = ''
+  try {
+    backendDiagnostics.value = await fetchBackendDiagnostics()
+  } catch (err: any) {
+    backendDiagnosticsError.value = err?.message || String(err)
+  } finally {
+    backendDiagnosticsLoading.value = false
+  }
+}
 
 // ---- API 端点测试 ----
 interface TestItem {
@@ -439,6 +590,7 @@ async function runAllProxy() {
 
 onMounted(async () => {
   envInfo.hasToken = !!getToken()
+  void loadBackendDiagnostics()
   try {
     const resp = await fetch('/debug-env')
     if (!resp.ok) { envInfo.apiUpstream = `请求失败 (${resp.status})`; return }
@@ -479,9 +631,11 @@ onMounted(async () => {
 .diag-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
 .diag-header h2 { margin: 0; }
 .section { margin-bottom: 32px; }
+.section-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
 .section h3 { margin: 0 0 12px; font-size: 16px; border-bottom: 1px solid var(--border-color, #eee); padding-bottom: 8px; }
 .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; }
 .info-item { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; }
+.backend-diagnostics { margin-top: 12px; }
 .info-item .label { color: #666; min-width: 200px; flex-shrink: 0; }
 .info-item code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; word-break: break-all; font-size: 13px; }
 code.ok { color: #67c23a; }
@@ -498,5 +652,6 @@ code.url { font-size: 12px; word-break: break-all; }
 .diag-verdict.ok { color: #67c23a; }
 .diag-verdict.warn { color: #e6a23c; }
 .diag-verdict.fail { color: #f56c6c; }
+.status-note { color: #606266; font-size: 12px; }
 .latency { color: #909399; font-size: 12px; margin-top: 4px; }
 </style>

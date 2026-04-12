@@ -25,3 +25,7 @@ export async function pingPluginDb(): Promise<void> {
     connection?.release();
   }
 }
+
+export async function probePluginDb(): Promise<void> {
+  await pluginPool.query('SELECT 1 AS ok');
+}
