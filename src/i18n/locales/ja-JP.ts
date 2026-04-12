@@ -34,6 +34,12 @@ export default {
       operationFailed: '操作に失敗しました',
     },
   },
+  auth: {
+    title: 'システム管理ログイン',
+    login: 'ログイン',
+    rootOnly: 'system-admin にアクセスできるのは root のみです',
+    loginFailed: 'ログインに失敗しました。時間をおいて再試行してください。',
+  },
   layout: {
     title: 'システム管理',
     connecting: 'メインシステムに接続中...',
@@ -41,6 +47,9 @@ export default {
     noPermission: '権限が不足しています。管理者にお問い合わせください',
     permissionDenied: 'このページにアクセスする権限がありません',
     permissionCheckFailed: '権限の確認に失敗しました。後でもう一度お試しください',
+    logout: 'ログアウト',
+    rootOnlyDenied: 'system-admin にアクセスできるのは root のみです',
+    sessionExpired: 'セッションの有効期限が切れました。再度ログインしてください。',
   },
   permission: {
     title: 'プラグイン権限管理',

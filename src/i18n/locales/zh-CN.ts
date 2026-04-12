@@ -34,6 +34,12 @@ export default {
       operationFailed: '操作失败',
     },
   },
+  auth: {
+    title: '系统管理登录',
+    login: '登录',
+    rootOnly: '仅 root 可访问 system-admin',
+    loginFailed: '登录失败，请稍后重试',
+  },
   layout: {
     title: '系统管理',
     connecting: '正在连接主系统...',
@@ -41,6 +47,9 @@ export default {
     noPermission: '权限不足，请联系管理员配置',
     permissionDenied: '您没有权限访问此页面',
     permissionCheckFailed: '权限验证失败，请稍后重试',
+    logout: '退出登录',
+    rootOnlyDenied: '仅 root 可访问 system-admin',
+    sessionExpired: '登录已失效，请重新登录',
   },
   permission: {
     title: '插件权限管理',

@@ -34,6 +34,12 @@ export default {
       operationFailed: '操作失敗',
     },
   },
+  auth: {
+    title: '系統管理登入',
+    login: '登入',
+    rootOnly: '僅 root 可存取 system-admin',
+    loginFailed: '登入失敗，請稍後再試',
+  },
   layout: {
     title: '系統管理',
     connecting: '正在連線主系統...',
@@ -41,6 +47,9 @@ export default {
     noPermission: '權限不足，請聯繫管理員設定',
     permissionDenied: '您沒有權限存取此頁面',
     permissionCheckFailed: '權限驗證失敗，請稍後重試',
+    logout: '登出',
+    rootOnlyDenied: '僅 root 可存取 system-admin',
+    sessionExpired: '登入已失效，請重新登入',
   },
   permission: {
     title: '外掛權限管理',

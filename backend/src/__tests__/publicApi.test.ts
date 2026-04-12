@@ -107,7 +107,7 @@ describe('public API routes', () => {
     });
   });
 
-  it('returns allowed actions for the authenticated user', async () => {
+  it('returns wildcard allowed actions for authenticated root users', async () => {
     const app = createApp();
 
     mockedAxios.get.mockResolvedValue({
@@ -115,16 +115,12 @@ describe('public API routes', () => {
         code: 0,
         message: 'ok',
         data: {
-          id: 3,
-          username: 'alice',
-          roles: ['admin'],
+          id: 1,
+          username: 'root',
+          roles: ['root'],
         },
       },
     } as never);
-
-    pluginPool.query.mockResolvedValue([
-      [{ action: 'list-users,create-user' }, { action: 'update-user' }],
-    ]);
 
     const response = await request(app)
       .get('/api/v1/plugin/allowed-actions')
@@ -136,9 +132,9 @@ describe('public API routes', () => {
       code: 0,
       message: 'ok',
       data: {
-        actions: ['list-users', 'create-user', 'update-user'],
-        user_id: 3,
-        roles: ['admin'],
+        actions: ['*'],
+        user_id: 1,
+        roles: ['root'],
       },
     });
   });

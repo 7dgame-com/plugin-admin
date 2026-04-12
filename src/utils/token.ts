@@ -1,6 +1,8 @@
 const TOKEN_KEY = 'system-admin-token'
 const REFRESH_TOKEN_KEY = 'system-admin-refresh-token'
 
+export type RuntimeMode = 'embedded' | 'standalone'
+
 /** 是否在 iframe 中运行 */
 export function isInIframe(): boolean {
   try {
@@ -8,6 +10,10 @@ export function isInIframe(): boolean {
   } catch {
     return true
   }
+}
+
+export function getRuntimeMode(): RuntimeMode {
+  return isInIframe() ? 'embedded' : 'standalone'
 }
 
 export function getToken(): string | null {
