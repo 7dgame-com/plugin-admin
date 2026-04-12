@@ -9,7 +9,6 @@ jest.mock('axios');
 
 import axios from 'axios';
 import fc from 'fast-check';
-import { listMenuGroups as listMenuGroupsController } from '../controllers/menuGroups';
 import { createPlugin as createPluginController, listPlugins as listPluginsController } from '../controllers/plugins';
 import {
   createPermission as createPermissionController,
@@ -30,7 +29,8 @@ const { pluginPool } = jest.requireMock('../db/pluginDb') as {
   };
 };
 
-const DOMAIN = 'tenant.example.com';
+const ORGANIZATION_NAME = 'acme';
+const ORGANIZATION_TITLE = 'Acme Studio';
 const FIELD_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'.split('');
 const ID_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-'.split('');
 const URL_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789-'.split('');
@@ -63,21 +63,11 @@ type PluginRow = {
   description: string | null;
   url: string;
   icon: string | null;
-  group_id: string | null;
   enabled: number;
   order: number;
   allowed_origin: string | null;
   version: string | null;
-  domain: string | null;
-};
-
-type MenuGroupRow = {
-  id: string;
-  name: string;
-  name_i18n: string | null;
-  icon: string | null;
-  order: number;
-  domain: string | null;
+  organization_name: string | null;
 };
 
 function expectedPageLength(total: number, page: number, perPage: number): number {
@@ -191,12 +181,11 @@ function makePluginRows(length: number) {
     description: null,
     url: `https://example.com/plugin-${index + 1}`,
     icon: null,
-    group_id: null,
     enabled: 1,
     order: index,
     allowed_origin: null,
     version: '1.0.0',
-    domain: null,
+    organization_name: null,
   }));
 }
 
@@ -344,12 +333,11 @@ function installPluginListMock() {
         name_i18n: (params[3] ?? null) as string | null,
         description: (params[4] ?? null) as string | null,
         icon: (params[5] ?? null) as string | null,
-        group_id: (params[6] ?? null) as string | null,
-        enabled: Number(params[7] ?? 1),
-        order: Number(params[8] ?? 0),
-        allowed_origin: (params[9] ?? null) as string | null,
-        version: (params[10] ?? null) as string | null,
-        domain: (params[11] ?? null) as string | null,
+        enabled: Number(params[6] ?? 1),
+        order: Number(params[7] ?? 0),
+        allowed_origin: (params[8] ?? null) as string | null,
+        version: (params[9] ?? null) as string | null,
+        organization_name: (params[10] ?? null) as string | null,
       };
       return [{ affectedRows: 1 }];
     }
@@ -366,23 +354,12 @@ function installPluginListMock() {
   });
 }
 
-function createGroupRow(id: string, name: string, order: number, domain: string | null): MenuGroupRow {
-  return {
-    id,
-    name,
-    name_i18n: JSON.stringify({ 'en-US': name }),
-    icon: null,
-    order,
-    domain,
-  };
-}
-
 function createPluginRow(
   id: string,
   name: string,
   order: number,
   enabled: number,
-  domain: string | null
+  organizationName: string | null
 ): PluginRow {
   return {
     id,
@@ -391,12 +368,11 @@ function createPluginRow(
     description: `${name} description`,
     url: `https://${id}.example.com`,
     icon: null,
-    group_id: 'tools',
     enabled,
     order,
     allowed_origin: `https://${id}.example.com`,
     version: '1.0.0',
-    domain,
+    organization_name: organizationName,
   };
 }
 
@@ -766,50 +742,6 @@ describe('property tests', () => {
     );
   });
 
-  it('Feature: system-admin-db-decoupling, Property 6: 菜单分组排序不变量', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        fc.uniqueArray(
-          fc.record({
-            id: pluginIdString(1, 12),
-            name: fieldString(1, 24),
-            order: fc.integer({ min: -50, max: 50 }),
-          }),
-          {
-            selector: (row) => row.id,
-            maxLength: 12,
-          }
-        ),
-        async (rows) => {
-          pluginPool.query.mockReset();
-          const dbRows = rows.map((row) => createGroupRow(row.id, row.name, row.order, null));
-
-          pluginPool.query.mockImplementation(async (sql: string) => {
-            const normalized = normalizeSql(sql);
-            if (
-              normalized.startsWith('SELECT * FROM plugin_menu_groups ORDER BY `order` ASC')
-            ) {
-              return [sortByOrder(dbRows)];
-            }
-
-            throw new Error(`Unexpected menu group query: ${normalized}`);
-          });
-
-          const response = makeMockResponse();
-          await listMenuGroupsController({} as never, response as never);
-
-          expect(response.statusCode).toBe(200);
-          expect(
-            ((response.body as { data: { items: MenuGroupRow[] } }).data.items).map((item) => item.order)
-          ).toEqual(
-            sortByOrder(dbRows).map((item) => item.order)
-          );
-        }
-      ),
-      { numRuns: 50 }
-    );
-  });
-
   it('Feature: system-admin-db-decoupling, Property 7: 响应信封格式不变量', () => {
     fc.assert(
       fc.property(
@@ -943,7 +875,7 @@ describe('property tests', () => {
     );
   });
 
-  it('Feature: system-admin-db-decoupling, Property 9: list 端点域名合并不变量', async () => {
+  it('Feature: system-admin-db-decoupling, Property 9: list 端点组织可见性不变量', async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.uniqueArray(
@@ -951,22 +883,6 @@ describe('property tests', () => {
             id: pluginIdString(1, 12),
             name: fieldString(1, 24),
             order: fc.integer({ min: -20, max: 20 }),
-          }),
-          { selector: (row) => row.id, maxLength: 6 }
-        ),
-        fc.uniqueArray(
-          fc.record({
-            id: pluginIdString(1, 12),
-            name: fieldString(1, 24),
-            order: fc.integer({ min: -20, max: 20 }),
-          }),
-          { selector: (row) => row.id, maxLength: 6 }
-        ),
-        fc.uniqueArray(
-          fc.record({
-            id: pluginIdString(1, 12),
-            name: fieldString(1, 24),
-            order: fc.integer({ min: -20, max: 20 }),
             enabled: fc.integer({ min: 0, max: 1 }),
           }),
           { selector: (row) => row.id, maxLength: 6 }
@@ -980,20 +896,33 @@ describe('property tests', () => {
           }),
           { selector: (row) => row.id, maxLength: 6 }
         ),
-        async (generalGroupsInput, domainGroupsInput, generalPluginsInput, domainPluginsInput) => {
+        async (publicPluginsInput, organizationPluginsInput) => {
           pluginPool.query.mockReset();
+          mockedAxios.get.mockReset();
+          mockedAxios.get.mockResolvedValue({
+            data: {
+              code: 0,
+              message: 'ok',
+              data: {
+                id: 9,
+                username: 'alice',
+                roles: ['admin'],
+                organizations: [
+                  {
+                    id: 2,
+                    name: ORGANIZATION_NAME,
+                    title: ORGANIZATION_TITLE,
+                  },
+                ],
+              },
+            },
+          } as never);
 
-          const generalGroups = generalGroupsInput.map((row) =>
-            createGroupRow(row.id, row.name, row.order, null)
-          );
-          const domainGroups = domainGroupsInput.map((row) =>
-            createGroupRow(row.id, row.name, row.order, DOMAIN)
-          );
-          const generalPlugins = generalPluginsInput.map((row) =>
+          const publicPlugins = publicPluginsInput.map((row) =>
             createPluginRow(row.id, row.name, row.order, row.enabled, null)
           );
-          const domainPlugins = domainPluginsInput.map((row) =>
-            createPluginRow(row.id, row.name, row.order, row.enabled, DOMAIN)
+          const organizationPlugins = organizationPluginsInput.map((row) =>
+            createPluginRow(row.id, row.name, row.order, row.enabled, ORGANIZATION_NAME)
           );
 
           pluginPool.query.mockImplementation(async (sql: string, params: unknown[] = []) => {
@@ -1001,36 +930,14 @@ describe('property tests', () => {
 
             if (
               normalized.startsWith(
-                'SELECT * FROM plugin_menu_groups WHERE domain IS NULL ORDER BY `order` ASC'
+                'SELECT * FROM plugins WHERE enabled = 1 AND (organization_name IS NULL OR organization_name IN (?)) ORDER BY `order` ASC'
               )
             ) {
-              return [sortByOrder(generalGroups)];
-            }
-
-            if (
-              normalized.startsWith(
-                'SELECT * FROM plugin_menu_groups WHERE domain = ? ORDER BY `order` ASC'
-              )
-            ) {
-              expect(params).toEqual([DOMAIN]);
-              return [sortByOrder(domainGroups)];
-            }
-
-            if (
-              normalized.startsWith(
-                'SELECT * FROM plugins WHERE domain IS NULL AND enabled = 1 ORDER BY `order` ASC'
-              )
-            ) {
-              return [sortByOrder(generalPlugins.filter((plugin) => plugin.enabled === 1))];
-            }
-
-            if (
-              normalized.startsWith(
-                'SELECT * FROM plugins WHERE domain = ? AND enabled = 1 ORDER BY `order` ASC'
-              )
-            ) {
-              expect(params).toEqual([DOMAIN]);
-              return [sortByOrder(domainPlugins.filter((plugin) => plugin.enabled === 1))];
+              expect(params).toEqual([ORGANIZATION_NAME]);
+              return [sortByOrder([
+                ...publicPlugins.filter((plugin) => plugin.enabled === 1),
+                ...organizationPlugins.filter((plugin) => plugin.enabled === 1),
+              ])];
             }
 
             throw new Error(`Unexpected public list query: ${normalized}`);
@@ -1039,8 +946,8 @@ describe('property tests', () => {
           const response = makeMockResponse();
           await publicListController(
             {
-              query: {
-                domain: DOMAIN,
+              headers: {
+                authorization: 'Bearer token',
               },
             } as never,
             response as never
@@ -1049,11 +956,18 @@ describe('property tests', () => {
           expect(response.statusCode).toBe(200);
 
           const responseBody = response.body as {
-            menuGroups: Array<{ id: string; name: string; nameI18n: Record<string, string> | null; order: number }>;
+            menuGroups: Array<{
+              id: string;
+              name: string;
+              nameI18n: Record<string, string> | null;
+              icon: string | null;
+              order: number;
+            }>;
             plugins: Array<{
               id: string;
               name: string;
               nameI18n: Record<string, string> | null;
+              group: string;
               enabled: boolean;
               order: number;
               url: string;
@@ -1063,23 +977,22 @@ describe('property tests', () => {
           };
           const responseGroupIds = responseBody.menuGroups.map((group) => group.id);
           expect(new Set(responseGroupIds).size).toBe(responseGroupIds.length);
-
-          const expectedGroups = new Map<string, MenuGroupRow>();
-          for (const group of sortByOrder(generalGroups)) {
-            expectedGroups.set(group.id, group);
-          }
-          for (const group of sortByOrder(domainGroups)) {
-            expectedGroups.set(group.id, group);
-          }
-
-          expect(new Set(responseGroupIds)).toEqual(new Set(expectedGroups.keys()));
-          for (const group of responseBody.menuGroups) {
-            const expected = expectedGroups.get(group.id);
-            expect(expected).toBeDefined();
-            expect(group.name).toBe(expected?.name);
-            expect(group.nameI18n).toEqual(expected ? JSON.parse(expected.name_i18n ?? 'null') : null);
-            expect(group.order).toBe(expected?.order);
-          }
+          expect(responseBody.menuGroups).toEqual([
+            {
+              id: 'org:public',
+              name: '公共插件',
+              nameI18n: null,
+              icon: 'Grid',
+              order: 0,
+            },
+            {
+              id: `org:${ORGANIZATION_NAME}`,
+              name: ORGANIZATION_TITLE,
+              nameI18n: null,
+              icon: 'OfficeBuilding',
+              order: 1,
+            },
+          ]);
 
           const responsePlugins = responseBody.plugins;
           const responsePluginIds = responsePlugins.map((plugin) => plugin.id);
@@ -1087,10 +1000,10 @@ describe('property tests', () => {
           expect(responsePlugins.every((plugin) => plugin.enabled)).toBe(true);
 
           const expectedPlugins = new Map<string, PluginRow>();
-          for (const plugin of sortByOrder(generalPlugins.filter((row) => row.enabled === 1))) {
+          for (const plugin of sortByOrder(publicPlugins.filter((row) => row.enabled === 1))) {
             expectedPlugins.set(plugin.id, plugin);
           }
-          for (const plugin of sortByOrder(domainPlugins.filter((row) => row.enabled === 1))) {
+          for (const plugin of sortByOrder(organizationPlugins.filter((row) => row.enabled === 1))) {
             expectedPlugins.set(plugin.id, plugin);
           }
 
@@ -1106,6 +1019,9 @@ describe('property tests', () => {
             expect(plugin.allowedOrigin).toBe(expected?.allowed_origin ?? null);
             expect(plugin.version).toBe(expected?.version ?? null);
             expect(plugin.order).toBe(expected?.order);
+            expect(plugin.group).toBe(
+              expected?.organization_name ? `org:${expected.organization_name}` : 'org:public'
+            );
           }
         }
       ),

@@ -35,14 +35,14 @@
           <span>{{ t('plugin.title') }}</span>
         </router-link>
         <router-link
-          v-if="can('manage-plugins')"
-          to="/menu-groups"
+          v-if="can('manage-organizations')"
+          to="/organizations"
           class="sidebar-item"
-          :class="{ active: $route.path === '/menu-groups' }"
+          :class="{ active: $route.path === '/organizations' }"
           @click="sidebarOpen = false"
         >
-          <el-icon><Menu /></el-icon>
-          <span>{{ t('menuGroup.title') }}</span>
+          <el-icon><OfficeBuilding /></el-icon>
+          <span>{{ t('organization.title') }}</span>
         </router-link>
       </nav>
     </aside>
@@ -87,7 +87,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Close, Fold, Key, Grid, Menu, User, Loading } from '@element-plus/icons-vue'
+import { Close, Fold, Key, Grid, OfficeBuilding, User, Loading } from '@element-plus/icons-vue'
 import { pluginApi } from '../api'
 import { usePermissions } from '../composables/usePermissions'
 import { getRuntimeMode, removeAllTokens } from '../utils/token'
@@ -97,7 +97,12 @@ const { t } = useI18n()
 const { fetchPermissions, can, hasAny, loaded } = usePermissions()
 
 const sidebarOpen = ref(false)
-const userInfo = ref<{ username: string; nickname?: string; roles: string[] } | null>(null)
+const userInfo = ref<{
+  username: string
+  nickname?: string
+  roles: string[]
+  organizations?: Array<{ id: number; name: string; title: string }>
+} | null>(null)
 const ready = ref(false)
 
 async function handleLogout() {

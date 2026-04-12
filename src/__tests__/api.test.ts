@@ -29,6 +29,11 @@ describe('Property 1: API baseURL 包含 /backend/api 前缀', () => {
     expect(pluginApi.defaults.baseURL).toBeDefined()
     expect(pluginApi.defaults.baseURL!.startsWith('/backend/api/')).toBe(true)
   })
+
+  it('mainApi.defaults.baseURL targets the main backend v1 prefix', async () => {
+    const { mainApi } = await import('../api/index')
+    expect(mainApi.defaults.baseURL).toBe('/api/v1')
+  })
 })
 
 // Feature: system-admin-plugin-upgrade, Property 5: x-refresh-token 响应头自动持久化

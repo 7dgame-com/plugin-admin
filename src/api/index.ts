@@ -34,6 +34,14 @@ export const authApi = axios.create({
   timeout: 10000
 })
 
+/**
+ * 主后端接口（指向主系统 /api/v1）
+ */
+export const mainApi = axios.create({
+  baseURL: '/api/v1',
+  timeout: 10000
+})
+
 // --- Token refresh state ---
 let isRefreshing = false
 let failedQueue: Array<{
@@ -162,6 +170,8 @@ function setupInterceptors(instance: ReturnType<typeof axios.create>) {
 
 setupInterceptors(adminApi)
 setupInterceptors(pluginApi)
+setupInterceptors(authApi)
+setupInterceptors(mainApi)
 
 // 默认导出 adminApi，同时具名导出 pluginApi
 export default adminApi
@@ -178,8 +188,19 @@ export const createPlugin = (data: Record<string, unknown>) => adminApi.post('/c
 export const updatePlugin = (data: Record<string, unknown>) => adminApi.put('/update-plugin', data)
 export const deletePlugin = (id: string) => adminApi.post('/delete-plugin', { id })
 
-// 菜单分组 API
-export const getMenuGroups = () => adminApi.get('/menu-groups')
-export const createMenuGroup = (data: Record<string, unknown>) => adminApi.post('/create-menu-group', data)
-export const updateMenuGroup = (data: Record<string, unknown>) => adminApi.put('/update-menu-group', data)
-export const deleteMenuGroup = (id: string) => adminApi.post('/delete-menu-group', { id })
+export interface OrganizationItem {
+  id: number
+  title: string
+  name: string
+}
+
+// 组织管理 API（主后端）
+export const getOrganizations = () => mainApi.get('/organization/list')
+export const createOrganization = (data: Pick<OrganizationItem, 'title' | 'name'>) =>
+  mainApi.post('/organization/create', data)
+export const updateOrganization = (data: Pick<OrganizationItem, 'id' | 'title'>) =>
+  mainApi.post('/organization/update', data)
+export const bindOrganizationUser = (data: { user_id: number; organization_id: number }) =>
+  mainApi.post('/organization/bind-user', data)
+export const unbindOrganizationUser = (data: { user_id: number; organization_id: number }) =>
+  mainApi.post('/organization/unbind-user', data)

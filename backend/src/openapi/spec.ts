@@ -38,7 +38,6 @@ export const openApiDocument = {
     { name: 'System', description: 'System-level endpoints' },
     { name: 'Permission Admin', description: 'Permission management endpoints' },
     { name: 'Plugin Admin', description: 'Plugin management endpoints' },
-    { name: 'Menu Group Admin', description: 'Menu group management endpoints' },
     { name: 'Public Plugin API', description: 'Public plugin helper endpoints' },
   ],
   paths: {
@@ -136,7 +135,7 @@ export const openApiDocument = {
         summary: 'List plugin records',
         security: bearerSecurity,
         parameters: [
-          { in: 'query', name: 'domain', schema: { type: 'string' } },
+          { in: 'query', name: 'organization_name', schema: { type: 'string' } },
           { in: 'query', name: 'page', schema: { type: 'integer', minimum: 1, default: 1 } },
           { in: 'query', name: 'per_page', schema: { type: 'integer', minimum: 1, default: 20 } },
         ],
@@ -206,77 +205,6 @@ export const openApiDocument = {
         },
       },
     },
-    '/api/v1/plugin-admin/menu-groups': {
-      get: {
-        tags: ['Menu Group Admin'],
-        summary: 'List menu groups',
-        security: bearerSecurity,
-        responses: {
-          '200': okResponse('Menu groups', '#/components/schemas/MenuGroupListResponse'),
-          '401': errorResponse('Missing or invalid bearer token'),
-          '403': errorResponse('Permission denied'),
-          '500': errorResponse('Database query failed'),
-        },
-      },
-    },
-    '/api/v1/plugin-admin/create-menu-group': {
-      post: {
-        tags: ['Menu Group Admin'],
-        summary: 'Create a menu group',
-        security: bearerSecurity,
-        requestBody: {
-          required: true,
-          content: jsonContent({ $ref: '#/components/schemas/CreateMenuGroupRequest' }),
-        },
-        responses: {
-          '200': okResponse('Menu group created', '#/components/schemas/MenuGroupMutationResponse'),
-          '400': errorResponse('Validation failed'),
-          '401': errorResponse('Missing or invalid bearer token'),
-          '403': errorResponse('Permission denied'),
-          '422': errorResponse('Duplicate menu group id'),
-          '500': errorResponse('Database write failed'),
-        },
-      },
-    },
-    '/api/v1/plugin-admin/update-menu-group': {
-      put: {
-        tags: ['Menu Group Admin'],
-        summary: 'Update a menu group',
-        security: bearerSecurity,
-        requestBody: {
-          required: true,
-          content: jsonContent({ $ref: '#/components/schemas/UpdateMenuGroupRequest' }),
-        },
-        responses: {
-          '200': okResponse('Menu group updated', '#/components/schemas/MenuGroupMutationResponse'),
-          '400': errorResponse('Validation failed'),
-          '401': errorResponse('Missing or invalid bearer token'),
-          '403': errorResponse('Permission denied'),
-          '404': errorResponse('Menu group record not found'),
-          '422': errorResponse('Duplicate menu group id'),
-          '500': errorResponse('Database write failed'),
-        },
-      },
-    },
-    '/api/v1/plugin-admin/delete-menu-group': {
-      post: {
-        tags: ['Menu Group Admin'],
-        summary: 'Delete a menu group',
-        security: bearerSecurity,
-        requestBody: {
-          required: true,
-          content: jsonContent({ $ref: '#/components/schemas/DeleteMenuGroupRequest' }),
-        },
-        responses: {
-          '200': okResponse('Menu group deleted', '#/components/schemas/GenericSuccessResponse'),
-          '400': errorResponse('Validation failed'),
-          '401': errorResponse('Missing or invalid bearer token'),
-          '403': errorResponse('Permission denied'),
-          '404': errorResponse('Menu group record not found'),
-          '500': errorResponse('Database delete failed'),
-        },
-      },
-    },
     '/api/v1/plugin/check-permission': {
       get: {
         tags: ['Public Plugin API'],
@@ -312,9 +240,6 @@ export const openApiDocument = {
       get: {
         tags: ['Public Plugin API'],
         summary: 'List public plugin menu groups and enabled plugins',
-        parameters: [
-          { in: 'query', name: 'domain', schema: { type: 'string' } },
-        ],
         responses: {
           '200': okResponse('Public plugin list', '#/components/schemas/PublicPluginListResponse'),
           '500': errorResponse('Database query failed'),
@@ -458,12 +383,11 @@ export const openApiDocument = {
           description: { type: 'string', nullable: true },
           url: { type: 'string', format: 'uri' },
           icon: { type: 'string', nullable: true },
-          group_id: { type: 'string', nullable: true },
           enabled: { type: 'integer' },
           order: { type: 'integer' },
           allowed_origin: { type: 'string', nullable: true },
           version: { type: 'string', nullable: true },
-          domain: { type: 'string', nullable: true },
+          organization_name: { type: 'string', nullable: true },
           created_at: { type: 'string', nullable: true },
           updated_at: { type: 'string', nullable: true },
         },
@@ -508,12 +432,11 @@ export const openApiDocument = {
           name_i18n: { type: 'string', nullable: true },
           description: { type: 'string', nullable: true },
           icon: { type: 'string', nullable: true },
-          group_id: { type: 'string', nullable: true },
           enabled: { type: 'integer' },
           order: { type: 'integer' },
           allowed_origin: { type: 'string', nullable: true },
           version: { type: 'string', nullable: true },
-          domain: { type: 'string', nullable: true },
+          organization_name: { type: 'string', nullable: true },
         },
       },
       UpdatePluginRequest: {
@@ -526,84 +449,14 @@ export const openApiDocument = {
           name_i18n: { type: 'string', nullable: true },
           description: { type: 'string', nullable: true },
           icon: { type: 'string', nullable: true },
-          group_id: { type: 'string', nullable: true },
           enabled: { type: 'integer' },
           order: { type: 'integer' },
           allowed_origin: { type: 'string', nullable: true },
           version: { type: 'string', nullable: true },
-          domain: { type: 'string', nullable: true },
+          organization_name: { type: 'string', nullable: true },
         },
       },
       DeletePluginRequest: {
-        type: 'object',
-        required: ['id'],
-        properties: {
-          id: { type: 'string', maxLength: 64 },
-        },
-      },
-      MenuGroupItem: {
-        type: 'object',
-        properties: {
-          id: { type: 'string' },
-          name: { type: 'string' },
-          name_i18n: { type: 'string', nullable: true },
-          icon: { type: 'string', nullable: true },
-          order: { type: 'integer' },
-          domain: { type: 'string', nullable: true },
-        },
-      },
-      MenuGroupListResponse: {
-        type: 'object',
-        required: ['code', 'message', 'data'],
-        properties: {
-          code: { type: 'integer', example: 0 },
-          message: { type: 'string', example: 'ok' },
-          data: {
-            type: 'object',
-            required: ['items'],
-            properties: {
-              items: {
-                type: 'array',
-                items: { $ref: '#/components/schemas/MenuGroupItem' },
-              },
-            },
-          },
-        },
-      },
-      MenuGroupMutationResponse: {
-        type: 'object',
-        required: ['code', 'message', 'data'],
-        properties: {
-          code: { type: 'integer', example: 0 },
-          message: { type: 'string', example: 'ok' },
-          data: { $ref: '#/components/schemas/MenuGroupItem' },
-        },
-      },
-      CreateMenuGroupRequest: {
-        type: 'object',
-        required: ['id', 'name'],
-        properties: {
-          id: { type: 'string', maxLength: 64 },
-          name: { type: 'string', maxLength: 128 },
-          name_i18n: { type: 'string', nullable: true },
-          icon: { type: 'string', nullable: true },
-          order: { type: 'integer' },
-          domain: { type: 'string', nullable: true },
-        },
-      },
-      UpdateMenuGroupRequest: {
-        type: 'object',
-        required: ['id'],
-        properties: {
-          id: { type: 'string', maxLength: 64 },
-          name: { type: 'string', maxLength: 128 },
-          name_i18n: { type: 'string', nullable: true },
-          icon: { type: 'string', nullable: true },
-          order: { type: 'integer' },
-          domain: { type: 'string', nullable: true },
-        },
-      },
-      DeleteMenuGroupRequest: {
         type: 'object',
         required: ['id'],
         properties: {

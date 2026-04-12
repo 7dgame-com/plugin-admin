@@ -4,7 +4,6 @@ import express, { NextFunction, Request, Response } from 'express';
 import { pingPluginDb } from './db/pluginDb';
 import { openApiDocument } from './openapi/spec';
 import diagnosticsRouter from './routes/diagnostics';
-import menuGroupsRouter from './routes/menuGroups';
 import permissionsRouter from './routes/permissions';
 import pluginsRouter from './routes/plugins';
 import publicApiRouter from './routes/publicApi';
@@ -52,7 +51,6 @@ export function createApp() {
 
   app.use('/api/v1/plugin-admin', permissionsRouter);
   app.use('/api/v1/plugin-admin', pluginsRouter);
-  app.use('/api/v1/plugin-admin', menuGroupsRouter);
   app.use('/api/v1/plugin', publicApiRouter);
 
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

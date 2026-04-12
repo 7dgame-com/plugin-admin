@@ -10,12 +10,11 @@ type PluginRow = QueryRow & {
   description: string | null;
   url: string;
   icon: string | null;
-  group_id: string | null;
   enabled: number;
   order: number;
   allowed_origin: string | null;
   version: string | null;
-  domain: string | null;
+  organization_name: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -69,25 +68,26 @@ function buildPluginPayload(body: Record<string, unknown>) {
     name_i18n: encodeJsonField(body.name_i18n),
     description: body.description ?? null,
     icon: body.icon ?? null,
-    group_id: body.group_id ?? null,
     enabled: body.enabled ?? 1,
     order: body.order ?? 0,
     allowed_origin: body.allowed_origin ?? null,
     version: body.version ?? null,
-    domain: body.domain ?? null,
+    organization_name: body.organization_name ?? null,
   };
 }
 
 export async function listPlugins(req: Request, res: Response): Promise<void> {
-  const domain = typeof req.query.domain === 'string' ? req.query.domain : '';
+  const organizationName = typeof req.query.organization_name === 'string'
+    ? req.query.organization_name.trim()
+    : '';
   const page = asPositiveInt(req.query.page, 1);
   const perPage = asPositiveInt(req.query.per_page, 20);
 
   const filters: string[] = [];
   const params: unknown[] = [];
-  if (domain !== '') {
-    filters.push('domain = ?');
-    params.push(domain);
+  if (organizationName !== '') {
+    filters.push('organization_name = ?');
+    params.push(organizationName);
   }
 
   const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
@@ -148,7 +148,7 @@ export async function createPlugin(req: Request, res: Response): Promise<void> {
     await pluginPool.query(
       `
         INSERT INTO plugins
-          (id, name, url, name_i18n, description, icon, group_id, enabled, \`order\`, allowed_origin, version, domain)
+          (id, name, url, name_i18n, description, icon, enabled, \`order\`, allowed_origin, version, organization_name)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
@@ -158,12 +158,11 @@ export async function createPlugin(req: Request, res: Response): Promise<void> {
         payload.name_i18n,
         payload.description,
         payload.icon,
-        payload.group_id,
         payload.enabled,
         payload.order,
         payload.allowed_origin,
         payload.version,
-        payload.domain,
+        payload.organization_name,
       ]
     );
 
@@ -207,12 +206,11 @@ export async function updatePlugin(req: Request, res: Response): Promise<void> {
       'description',
       'url',
       'icon',
-      'group_id',
       'enabled',
       'order',
       'allowed_origin',
       'version',
-      'domain',
+      'organization_name',
     ] as const;
 
     const updates: string[] = [];

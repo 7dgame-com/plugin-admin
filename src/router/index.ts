@@ -51,10 +51,10 @@ const router = createRouter({
           meta: { title: '插件注册管理', requiresPermission: 'manage-plugins' }
         },
         {
-          path: 'menu-groups',
-          name: 'MenuGroupList',
-          component: () => import('../views/MenuGroupList.vue'),
-          meta: { title: '菜单分组管理', requiresPermission: 'manage-plugins' }
+          path: 'organizations',
+          name: 'OrganizationList',
+          component: () => import('../views/OrganizationList.vue'),
+          meta: { title: '组织管理', requiresPermission: 'manage-organizations' }
         },
       ]
     }
