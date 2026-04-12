@@ -13,32 +13,43 @@ const permissions = ref<Permissions>({
 
 const loaded = ref(false)
 const loading = ref(false)
+let loadingPromise: Promise<void> | null = null
 
 export function usePermissions() {
   async function fetchPermissions() {
-    if (loaded.value || loading.value) return
-    loading.value = true
-    try {
-      const { data } = await pluginApi.get('/allowed-actions', {
-        params: { plugin_name: 'system-admin' }
-      })
-      if (data.code === 0) {
-        const allowedActions: string[] = data.data?.actions || []
-        const allActions: (keyof Permissions)[] = [
-          'manage-permissions',
-          'manage-plugins',
-        ]
-        const hasWildcard = allowedActions.includes('*')
-        allActions.forEach((a) => {
-          permissions.value[a] = hasWildcard || allowedActions.includes(a)
-        })
-      }
-      loaded.value = true
-    } catch {
-      // 权限获取失败时保持默认（全部 false）
-    } finally {
-      loading.value = false
+    if (loaded.value) return
+    if (loadingPromise) {
+      await loadingPromise
+      return
     }
+
+    loading.value = true
+    loadingPromise = (async () => {
+      try {
+        const { data } = await pluginApi.get('/allowed-actions', {
+          params: { plugin_name: 'system-admin' }
+        })
+        if (data.code === 0) {
+          const allowedActions: string[] = data.data?.actions || []
+          const allActions: (keyof Permissions)[] = [
+            'manage-permissions',
+            'manage-plugins',
+          ]
+          const hasWildcard = allowedActions.includes('*')
+          allActions.forEach((a) => {
+            permissions.value[a] = hasWildcard || allowedActions.includes(a)
+          })
+        }
+        loaded.value = true
+      } catch {
+        // 权限获取失败时保持默认（全部 false）
+      } finally {
+        loading.value = false
+        loadingPromise = null
+      }
+    })()
+
+    await loadingPromise
   }
 
   function can(action: keyof Permissions): boolean {

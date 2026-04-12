@@ -61,10 +61,10 @@ const router = createRouter({
   ]
 })
 
-export function permissionGuard(
+export async function permissionGuard(
   to: { meta: { public?: boolean; requiresPermission?: string }; fullPath: string },
   from: { name?: string | symbol | null | undefined }
-): boolean | string | { name: string; query: { redirect: string } } {
+): Promise<boolean | string | { name: string; query: { redirect: string } }> {
   if (to.meta.public) return true
 
   if (getRuntimeMode() === 'standalone' && !getToken()) {
@@ -78,7 +78,10 @@ export function permissionGuard(
   if (!requiredPermission) return true
 
   try {
-    const { can } = usePermissions()
+    const { can, loaded, fetchPermissions } = usePermissions()
+    if (!loaded.value) {
+      await fetchPermissions()
+    }
     if (can(requiredPermission as Parameters<typeof can>[0])) {
       return true
     }
