@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import express, { NextFunction, Request, Response } from 'express';
 import { pingPluginDb } from './db/pluginDb';
 import { openApiDocument } from './openapi/spec';
+import diagnosticsRouter from './routes/diagnostics';
 import menuGroupsRouter from './routes/menuGroups';
 import permissionsRouter from './routes/permissions';
 import pluginsRouter from './routes/plugins';
@@ -29,6 +30,8 @@ export function createApp() {
 
   app.use(cors());
   app.use(express.json());
+
+  app.use('/diagnostics', diagnosticsRouter);
 
   app.get('/health', async (_req, res) => {
     try {
