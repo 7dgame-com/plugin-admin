@@ -1,12 +1,17 @@
+import axios from 'axios'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as fc from 'fast-check'
+
+const mockIsInIframe = vi.fn().mockReturnValue(false)
+const mockRequestParentTokenRefresh = vi.fn().mockResolvedValue(null)
 
 vi.mock('../utils/token', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/token')>()
   return {
     ...actual,
-    isInIframe: vi.fn().mockReturnValue(false),
-    requestParentTokenRefresh: vi.fn().mockResolvedValue(null),
+    isInIframe: mockIsInIframe,
+    getRuntimeMode: vi.fn(() => (mockIsInIframe() ? 'embedded' : 'standalone')),
+    requestParentTokenRefresh: mockRequestParentTokenRefresh,
   }
 })
 
@@ -67,6 +72,8 @@ describe('Property 6: 两段式 token 刷新顺序', () => {
   beforeEach(() => {
     localStorage.clear()
     vi.clearAllMocks()
+    mockIsInIframe.mockReturnValue(false)
+    mockRequestParentTokenRefresh.mockResolvedValue(null)
   })
   afterEach(() => { vi.restoreAllMocks() })
 
@@ -76,9 +83,8 @@ describe('Property 6: 两段式 token 刷新顺序', () => {
         vi.clearAllMocks()
         localStorage.clear()
 
-        const tokenModule = await import('../utils/token')
-        vi.mocked(tokenModule.isInIframe).mockReturnValue(inIframe)
-        vi.mocked(tokenModule.requestParentTokenRefresh).mockResolvedValue(null)
+        mockIsInIframe.mockReturnValue(inIframe)
+        mockRequestParentTokenRefresh.mockResolvedValue(null)
 
         const { default: adminApi } = await import('../api/index')
 
@@ -110,12 +116,65 @@ describe('Property 6: 两段式 token 刷新顺序', () => {
         }
 
         if (inIframe) {
-          expect(vi.mocked(tokenModule.requestParentTokenRefresh)).toHaveBeenCalled()
+          expect(mockRequestParentTokenRefresh).toHaveBeenCalled()
         } else {
-          expect(vi.mocked(tokenModule.requestParentTokenRefresh)).not.toHaveBeenCalled()
+          expect(mockRequestParentTokenRefresh).not.toHaveBeenCalled()
         }
       })
     )
+  })
+
+  it('uses /api/v1/auth/refresh in standalone mode and retries with the new bearer token', async () => {
+    mockIsInIframe.mockReturnValue(false)
+    localStorage.setItem('system-admin-refresh-token', 'refresh-1')
+
+    const { default: adminApi, authApi } = await import('../api/index')
+    const authPostSpy = vi.spyOn(authApi, 'post').mockResolvedValue({
+      data: {
+        success: true,
+        token: {
+          accessToken: 'new-access-token',
+          refreshToken: 'refresh-2',
+        },
+      },
+    } as never)
+
+    let callCount = 0
+    const originalAdapter = adminApi.defaults.adapter
+    adminApi.defaults.adapter = async (config: import('axios').InternalAxiosRequestConfig) => {
+      callCount += 1
+
+      if (callCount === 1) {
+        throw Object.assign(new Error('Unauthorized'), {
+          response: { status: 401, data: {}, headers: {}, config, statusText: 'Unauthorized' },
+          config,
+          isAxiosError: true,
+        })
+      }
+
+      expect(config.headers.Authorization).toBe('Bearer new-access-token')
+
+      return {
+        status: 200,
+        statusText: 'OK',
+        data: { ok: true },
+        headers: {},
+        config,
+      }
+    }
+
+    try {
+      const response = await adminApi.get('/test')
+
+      expect(response.data).toEqual({ ok: true })
+      expect(authPostSpy).toHaveBeenCalledWith('/refresh', {
+        refreshToken: 'refresh-1',
+      })
+      expect(localStorage.getItem('system-admin-token')).toBe('new-access-token')
+      expect(localStorage.getItem('system-admin-refresh-token')).toBe('refresh-2')
+    } finally {
+      adminApi.defaults.adapter = originalAdapter
+    }
   })
 })
 
@@ -125,13 +184,13 @@ describe('Property 7: 双段刷新失败触发 TOKEN_EXPIRED', () => {
   beforeEach(() => {
     localStorage.clear()
     vi.clearAllMocks()
+    mockIsInIframe.mockReturnValue(true)
+    mockRequestParentTokenRefresh.mockResolvedValue(null)
   })
   afterEach(() => { vi.restoreAllMocks() })
 
   it('calls removeAllTokens and posts TOKEN_EXPIRED when both refresh stages fail', async () => {
     const tokenModule = await import('../utils/token')
-    vi.mocked(tokenModule.isInIframe).mockReturnValue(true)
-    vi.mocked(tokenModule.requestParentTokenRefresh).mockResolvedValue(null)
     // no local refresh token in localStorage
 
     const removeAllTokensSpy = vi.spyOn(tokenModule, 'removeAllTokens')
@@ -163,5 +222,38 @@ describe('Property 7: 双段刷新失败触发 TOKEN_EXPIRED', () => {
       (c) => c[0]?.type === 'TOKEN_EXPIRED'
     )
     expect(tokenExpiredCalls.length).toBeGreaterThan(0)
+  })
+
+  it('clears local tokens without posting TOKEN_EXPIRED when standalone refresh fails', async () => {
+    mockIsInIframe.mockReturnValue(false)
+    localStorage.setItem('system-admin-token', 'old-access')
+    localStorage.setItem('system-admin-refresh-token', 'refresh-1')
+
+    const tokenModule = await import('../utils/token')
+    const removeAllTokensSpy = vi.spyOn(tokenModule, 'removeAllTokens')
+    const postMessageSpy = vi.spyOn(window.parent, 'postMessage')
+
+    const { default: adminApi, authApi } = await import('../api/index')
+    const authPostSpy = vi.spyOn(authApi, 'post').mockRejectedValue(new Error('refresh failed'))
+
+    const originalAdapter = adminApi.defaults.adapter
+    adminApi.defaults.adapter = async (config: import('axios').InternalAxiosRequestConfig) => {
+      throw Object.assign(new Error('Unauthorized'), {
+        response: { status: 401, data: {}, headers: {}, config, statusText: 'Unauthorized' },
+        config,
+        isAxiosError: true,
+      })
+    }
+
+    try {
+      await expect(adminApi.get('/test')).rejects.toBeTruthy()
+      expect(authPostSpy).toHaveBeenCalledWith('/refresh', {
+        refreshToken: 'refresh-1',
+      })
+      expect(removeAllTokensSpy).toHaveBeenCalled()
+      expect(postMessageSpy).not.toHaveBeenCalledWith({ type: 'TOKEN_EXPIRED' }, '*')
+    } finally {
+      adminApi.defaults.adapter = originalAdapter
+    }
   })
 })
