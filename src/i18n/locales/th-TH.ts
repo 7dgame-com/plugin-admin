@@ -34,6 +34,12 @@ export default {
       operationFailed: 'การดำเนินการล้มเหลว',
     },
   },
+  auth: {
+    title: 'เข้าสู่ระบบผู้ดูแลระบบ',
+    login: 'เข้าสู่ระบบ',
+    rootOnly: 'เฉพาะผู้ใช้ root เท่านั้นที่เข้า system-admin ได้',
+    loginFailed: 'เข้าสู่ระบบไม่สำเร็จ โปรดลองอีกครั้ง',
+  },
   layout: {
     title: 'จัดการระบบ',
     connecting: 'กำลังเชื่อมต่อระบบหลัก...',
@@ -41,6 +47,9 @@ export default {
     noPermission: 'สิทธิ์ไม่เพียงพอ กรุณาติดต่อผู้ดูแลระบบ',
     permissionDenied: 'คุณไม่มีสิทธิ์เข้าถึงหน้านี้',
     permissionCheckFailed: 'การตรวจสอบสิทธิ์ล้มเหลว กรุณาลองใหม่ภายหลัง',
+    logout: 'ออกจากระบบ',
+    rootOnlyDenied: 'เฉพาะผู้ใช้ root เท่านั้นที่เข้า system-admin ได้',
+    sessionExpired: 'เซสชันหมดอายุแล้ว กรุณาเข้าสู่ระบบใหม่',
   },
   permission: {
     title: 'จัดการสิทธิ์ปลั๊กอิน',

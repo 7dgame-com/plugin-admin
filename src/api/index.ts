@@ -1,10 +1,10 @@
 import axios from 'axios'
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import {
+  getRuntimeMode,
   getToken,
   setToken,
   removeAllTokens,
-  isInIframe,
   requestParentTokenRefresh,
   getRefreshToken,
   setRefreshToken
@@ -23,6 +23,14 @@ const adminApi = axios.create({
  */
 export const pluginApi = axios.create({
   baseURL: '/backend/api/v1/plugin',
+  timeout: 10000
+})
+
+/**
+ * 主平台认证接口（指向主平台 /api/v1/auth）
+ */
+export const authApi = axios.create({
+  baseURL: '/api/v1/auth',
   timeout: 10000
 })
 
@@ -45,21 +53,33 @@ function processQueue(error: Error | null, token: string | null) {
 }
 
 async function tryRefreshToken(): Promise<string | null> {
-  if (isInIframe()) {
+  if (getRuntimeMode() === 'embedded') {
     const result = await requestParentTokenRefresh()
     if (result?.accessToken) {
       setToken(result.accessToken)
       return result.accessToken
     }
-    // parent timed out, fall through to local refresh
+    return null
   }
+
   const refreshToken = getRefreshToken()
   if (!refreshToken) return null
+
   try {
-    const res = await axios.post('/api/auth/refresh', { refreshToken })
-    const { accessToken, refreshToken: newRefreshToken } = res.data
+    const res = await authApi.post('/refresh', { refreshToken })
+    const tokenPayload = res.data?.token
+    const accessToken = tokenPayload?.accessToken
+
+    if (typeof accessToken !== 'string' || accessToken.length === 0) {
+      return null
+    }
+
     setToken(accessToken)
-    if (newRefreshToken) setRefreshToken(newRefreshToken)
+
+    if (typeof tokenPayload?.refreshToken === 'string' && tokenPayload.refreshToken.length > 0) {
+      setRefreshToken(tokenPayload.refreshToken)
+    }
+
     return accessToken
   } catch {
     return null
@@ -115,11 +135,15 @@ function setupInterceptors(instance: ReturnType<typeof axios.create>) {
 
         processQueue(null, newToken)
 
+        originalRequest.headers = originalRequest.headers ?? {}
         originalRequest.headers.Authorization = `Bearer ${newToken}`
         return instance(originalRequest)
       } catch (refreshError) {
         removeAllTokens()
-        window.parent.postMessage({ type: 'TOKEN_EXPIRED' }, '*')
+
+        if (getRuntimeMode() === 'embedded') {
+          window.parent.postMessage({ type: 'TOKEN_EXPIRED' }, '*')
+        }
 
         processQueue(
           refreshError instanceof Error
