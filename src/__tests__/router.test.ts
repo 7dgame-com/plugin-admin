@@ -2,6 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockGetToken = vi.fn()
 const mockGetRuntimeMode = vi.fn()
+const mockFetchPermissions = vi.fn()
+const mockCan = vi.fn()
+const permissionState = {
+  loaded: { value: true },
+  loading: { value: false },
+}
 
 vi.mock('../utils/token', () => ({
   getToken: () => mockGetToken(),
@@ -10,9 +16,10 @@ vi.mock('../utils/token', () => ({
 
 vi.mock('../composables/usePermissions', () => ({
   usePermissions: () => ({
-    loaded: { value: true },
-    fetchPermissions: vi.fn(),
-    can: () => true,
+    loaded: permissionState.loaded,
+    loading: permissionState.loading,
+    fetchPermissions: mockFetchPermissions,
+    can: mockCan,
     hasAny: () => true,
   }),
 }))
@@ -31,8 +38,13 @@ describe('router auth guards', () => {
   beforeEach(async () => {
     mockGetToken.mockReset()
     mockGetRuntimeMode.mockReset()
+    mockFetchPermissions.mockReset()
+    mockCan.mockReset()
     mockGetToken.mockReturnValue('token')
     mockGetRuntimeMode.mockReturnValue('standalone')
+    permissionState.loaded.value = true
+    permissionState.loading.value = false
+    mockCan.mockReturnValue(true)
     await router.push('/api-diagnostics')
     await router.isReady()
   })
@@ -58,5 +70,20 @@ describe('router auth guards', () => {
     await router.push('/permissions')
 
     expect(router.currentRoute.value.path).toBe('/permissions')
+  })
+
+  it('waits for permissions to load before allowing the first standalone redirect after login', async () => {
+    permissionState.loaded.value = false
+    mockCan.mockReturnValue(false)
+    mockFetchPermissions.mockImplementation(async () => {
+      permissionState.loaded.value = true
+      mockCan.mockReturnValue(true)
+    })
+
+    await router.push('/login')
+    await router.push('/permissions')
+
+    expect(mockFetchPermissions).toHaveBeenCalledTimes(1)
+    expect(router.currentRoute.value.name).toBe('PermissionList')
   })
 })
