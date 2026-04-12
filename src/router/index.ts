@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { usePermissions } from '../composables/usePermissions'
 import i18n from '../i18n'
+import { getRuntimeMode, getToken } from '../utils/token'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -14,6 +15,18 @@ declare module 'vue-router' {
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    {
+      path: '/login',
+      name: 'Login',
+      component: () => import('../views/LoginView.vue'),
+      meta: { title: '登录', public: true }
+    },
+    {
+      path: '/not-allowed',
+      name: 'NotAllowed',
+      component: () => import('../views/NotAllowed.vue'),
+      meta: { title: '禁止访问', public: true }
+    },
     {
       path: '/api-diagnostics',
       name: 'ApiDiagnostics',
@@ -49,10 +62,17 @@ const router = createRouter({
 })
 
 export function permissionGuard(
-  to: { meta: { public?: boolean; requiresPermission?: string } },
+  to: { meta: { public?: boolean; requiresPermission?: string }; fullPath: string },
   from: { name?: string | symbol | null | undefined }
-): boolean | string {
+): boolean | string | { name: string; query: { redirect: string } } {
   if (to.meta.public) return true
+
+  if (getRuntimeMode() === 'standalone' && !getToken()) {
+    return {
+      name: 'Login',
+      query: { redirect: to.fullPath }
+    }
+  }
 
   const requiredPermission = to.meta.requiresPermission
   if (!requiredPermission) return true
