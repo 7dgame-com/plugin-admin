@@ -2,13 +2,26 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express, { NextFunction, Request, Response } from 'express';
 import { pingPluginDb } from './db/pluginDb';
+import { openApiDocument } from './openapi/spec';
 import menuGroupsRouter from './routes/menuGroups';
 import permissionsRouter from './routes/permissions';
 import pluginsRouter from './routes/plugins';
 import publicApiRouter from './routes/publicApi';
 import { error, success } from './utils/response';
+import swaggerUi from 'swagger-ui-express';
 
 dotenv.config();
+
+const swaggerUiOptions = {
+  swaggerOptions: {
+    url: '/swagger/openapi.json',
+    deepLinking: true,
+    docExpansion: 'list',
+  },
+  customSiteTitle: 'System Admin Backend API Docs',
+};
+
+const swaggerUiHandler = swaggerUi.setup(undefined, swaggerUiOptions);
 
 export function createApp() {
   const app = express();
@@ -26,6 +39,13 @@ export function createApp() {
       res.status(500).json(error(5001, `数据库连接失败: ${message}`));
     }
   });
+
+  app.get('/swagger/openapi.json', (_req, res) => {
+    res.json(openApiDocument);
+  });
+  app.use('/swagger', swaggerUi.serveFiles(undefined, swaggerUiOptions));
+  app.get('/swagger', swaggerUiHandler);
+  app.get('/swagger/', swaggerUiHandler);
 
   app.use('/api/v1/plugin-admin', permissionsRouter);
   app.use('/api/v1/plugin-admin', pluginsRouter);
