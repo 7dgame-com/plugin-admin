@@ -10,19 +10,19 @@ vi.mock('../utils/token', async (importOriginal) => {
   }
 })
 
-// Feature: system-admin-plugin-upgrade, Property 1: API baseURL 包含 /api 前缀
+// Feature: system-admin-plugin-upgrade, Property 1: API baseURL 包含 /backend/api 前缀
 // Validates: Requirements 3.1, 3.2
-describe('Property 1: API baseURL 包含 /api 前缀', () => {
-  it('adminApi.defaults.baseURL starts with /api/', async () => {
+describe('Property 1: API baseURL 包含 /backend/api 前缀', () => {
+  it('adminApi.defaults.baseURL starts with /backend/api/', async () => {
     const { default: adminApi } = await import('../api/index')
     expect(adminApi.defaults.baseURL).toBeDefined()
-    expect(adminApi.defaults.baseURL!.startsWith('/api/')).toBe(true)
+    expect(adminApi.defaults.baseURL!.startsWith('/backend/api/')).toBe(true)
   })
 
-  it('pluginApi.defaults.baseURL starts with /api/', async () => {
+  it('pluginApi.defaults.baseURL starts with /backend/api/', async () => {
     const { pluginApi } = await import('../api/index')
     expect(pluginApi.defaults.baseURL).toBeDefined()
-    expect(pluginApi.defaults.baseURL!.startsWith('/api/')).toBe(true)
+    expect(pluginApi.defaults.baseURL!.startsWith('/backend/api/')).toBe(true)
   })
 })
 

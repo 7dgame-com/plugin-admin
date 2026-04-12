@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { configDefaults, defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 
 // 生成北京时间版本号，格式：2026.03.25-0200
@@ -21,6 +21,11 @@ export default defineConfig({
   server: {
     port: 3005,
     proxy: {
+      '/backend': {
+        target: 'http://localhost:8088',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/backend/, '')
+      },
       '/api': {
         target: 'http://localhost:8081',
         changeOrigin: true,
@@ -30,6 +35,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    globals: true
+    globals: true,
+    exclude: [...configDefaults.exclude, 'backend/**']
   }
 })

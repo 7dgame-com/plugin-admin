@@ -11,18 +11,18 @@ import {
 } from '../utils/token'
 
 /**
- * 管理接口（指向主后端 /api/v1/plugin-admin）
+ * 管理接口（指向 system-admin 自有后端 /backend/api/v1/plugin-admin）
  */
 const adminApi = axios.create({
-  baseURL: '/api/v1/plugin-admin',
+  baseURL: '/backend/api/v1/plugin-admin',
   timeout: 10000
 })
 
 /**
- * 通用插件接口（指向主后端 /api/v1/plugin，如 verify-token、allowed-actions）
+ * 通用插件接口（指向 system-admin 自有后端 /backend/api/v1/plugin）
  */
 export const pluginApi = axios.create({
-  baseURL: '/api/v1/plugin',
+  baseURL: '/backend/api/v1/plugin',
   timeout: 10000
 })
 

@@ -34,7 +34,7 @@
           <code>{{ envInfo.isIframe ? '是' : '否' }}</code>
         </div>
         <div class="info-item">
-          <span class="label">API 后端地址 (APP_API_N_URL)</span>
+          <span class="label">System-Admin 后端地址 (APP_BACKEND_N_URL)</span>
           <code :class="envInfo.apiUpstream === '加载中...' ? '' : envInfo.apiUpstream.startsWith('http') ? 'ok' : 'warn'">{{ envInfo.apiUpstream }}</code>
         </div>
         <div class="info-item">
@@ -174,7 +174,7 @@
     <div class="section">
       <h3>自定义 URL 测试</h3>
       <div class="custom-test">
-        <el-input v-model="customUrl" placeholder="输入完整或相对 URL，如 /api/v1/plugin-admin/permissions" style="flex:1" />
+        <el-input v-model="customUrl" placeholder="输入完整或相对 URL，如 /backend/api/v1/plugin-admin/permissions" style="flex:1" />
         <el-select v-model="customMethod" style="width: 120px">
           <el-option label="GET" value="GET" />
           <el-option label="POST" value="POST" />
@@ -199,8 +199,8 @@ import { getToken, isInIframe } from '../utils/token'
 const envInfo = reactive({
   location: window.location.href,
   origin: window.location.origin,
-  adminApiBase: adminApi.defaults.baseURL || '/api/v1/plugin-admin',
-  pluginApiBase: pluginApi.defaults.baseURL || '/api/v1/plugin',
+  adminApiBase: adminApi.defaults.baseURL || '/backend/api/v1/plugin-admin',
+  pluginApiBase: pluginApi.defaults.baseURL || '/backend/api/v1/plugin',
   hasToken: !!getToken(),
   isIframe: isInIframe(),
   apiUpstream: '加载中...',
@@ -225,8 +225,8 @@ interface TestItem {
 
 function makeTest(name: string, method: string, instance: 'adminApi' | 'pluginApi', path: string, params?: Record<string, any>): TestItem {
   const base = instance === 'adminApi'
-    ? (adminApi.defaults.baseURL || '/api/v1/plugin-admin')
-    : (pluginApi.defaults.baseURL || '/api/v1/plugin')
+    ? (adminApi.defaults.baseURL || '/backend/api/v1/plugin-admin')
+    : (pluginApi.defaults.baseURL || '/backend/api/v1/plugin')
   const qs = params ? '?' + new URLSearchParams(params as any).toString() : ''
   return {
     name, method, instance, path, params,
@@ -294,9 +294,9 @@ interface RawTestItem {
 }
 
 const rawTests = ref<RawTestItem[]>([
-  { name: 'adminApi /permissions', url: '/api/v1/plugin-admin/permissions?page=1&per_page=5', status: 'pending', httpStatus: '', responseBody: '', errorMessage: '' },
-  { name: 'pluginApi /verify-token', url: '/api/v1/plugin/verify-token?plugin_name=system-admin', status: 'pending', httpStatus: '', responseBody: '', errorMessage: '' },
-  { name: 'pluginApi /allowed-actions', url: '/api/v1/plugin/allowed-actions?plugin_name=system-admin', status: 'pending', httpStatus: '', responseBody: '', errorMessage: '' },
+  { name: 'adminApi /permissions', url: '/backend/api/v1/plugin-admin/permissions?page=1&per_page=5', status: 'pending', httpStatus: '', responseBody: '', errorMessage: '' },
+  { name: 'pluginApi /verify-token', url: '/backend/api/v1/plugin/verify-token?plugin_name=system-admin', status: 'pending', httpStatus: '', responseBody: '', errorMessage: '' },
+  { name: 'pluginApi /allowed-actions', url: '/backend/api/v1/plugin/allowed-actions?plugin_name=system-admin', status: 'pending', httpStatus: '', responseBody: '', errorMessage: '' },
   { name: 'Health Check', url: '/health', status: 'pending', httpStatus: '', responseBody: '', errorMessage: '' },
   { name: 'Debug Env', url: '/debug-env', status: 'pending', httpStatus: '', responseBody: '', errorMessage: '' },
 ])
@@ -367,8 +367,8 @@ interface ProxyTestItem {
 }
 
 const proxyTests = ref<ProxyTestItem[]>([
-  { name: '/api/ → adminApi', url: '/api/v1/plugin-admin/permissions?page=1&per_page=1', expectedBackend: 'proxy_pass → API 后端', status: 'pending', httpStatus: '', responseHeaders: '', responseBody: '', latency: null, verdict: 'ok', verdictIcon: '', verdictText: '' },
-  { name: '/api/ → pluginApi', url: '/api/v1/plugin/allowed-actions?plugin_name=system-admin', expectedBackend: 'proxy_pass → API 后端', status: 'pending', httpStatus: '', responseHeaders: '', responseBody: '', latency: null, verdict: 'ok', verdictIcon: '', verdictText: '' },
+  { name: '/backend/ → adminApi', url: '/backend/api/v1/plugin-admin/permissions?page=1&per_page=1', expectedBackend: 'proxy_pass → system-admin 后端', status: 'pending', httpStatus: '', responseHeaders: '', responseBody: '', latency: null, verdict: 'ok', verdictIcon: '', verdictText: '' },
+  { name: '/backend/ → pluginApi', url: '/backend/api/v1/plugin/allowed-actions?plugin_name=system-admin', expectedBackend: 'proxy_pass → system-admin 后端', status: 'pending', httpStatus: '', responseHeaders: '', responseBody: '', latency: null, verdict: 'ok', verdictIcon: '', verdictText: '' },
   { name: '/health', url: '/health', expectedBackend: '本地 Nginx 直接返回', status: 'pending', httpStatus: '', responseHeaders: '', responseBody: '', latency: null, verdict: 'ok', verdictIcon: '', verdictText: '' },
   { name: '/debug-env', url: '/debug-env', expectedBackend: '本地 Nginx 静态文件', status: 'pending', httpStatus: '', responseHeaders: '', responseBody: '', latency: null, verdict: 'ok', verdictIcon: '', verdictText: '' },
 ])
@@ -449,9 +449,9 @@ onMounted(async () => {
     const upstreams: string[] = []
     const backendUrls: string[] = []
     let i = 1
-    while (data[`APP_API_${i}_URL`]) {
-      backendUrls.push(data[`APP_API_${i}_URL`])
-      upstreams.push(`APP_API_${i}_URL=${data[`APP_API_${i}_URL`]}`)
+    while (data[`APP_BACKEND_${i}_URL`]) {
+      backendUrls.push(data[`APP_BACKEND_${i}_URL`])
+      upstreams.push(`APP_BACKEND_${i}_URL=${data[`APP_BACKEND_${i}_URL`]}`)
       i++
     }
     envInfo.apiUpstream = upstreams.length ? upstreams.join(' | ') : '未设置'
@@ -460,8 +460,8 @@ onMounted(async () => {
 
     if (backendUrls.length) {
       proxyTests.value.forEach(t => {
-        if (t.url.startsWith('/api/')) {
-          const backendPath = t.url.replace(/^\/api/, '')
+        if (t.url.startsWith('/backend/')) {
+          const backendPath = t.url.replace(/^\/backend/, '')
           t.expectedBackend = backendUrls.length === 1
             ? backendUrls[0].replace(/\/$/, '') + backendPath
             : backendUrls.map((u, idx) => `[${idx + 1}] ${u.replace(/\/$/, '') + backendPath}`).join(' → ')
