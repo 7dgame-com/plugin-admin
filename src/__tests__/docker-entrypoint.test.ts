@@ -15,4 +15,9 @@ describe('docker entrypoint nginx generation', () => {
   it('defaults resolver to Docker DNS', () => {
     expect(entrypoint).toContain('APP_RESOLVER:-127.0.0.11')
   })
+
+  it('generates both main-platform /api and system-admin /backend upstream blocks', () => {
+    expect(entrypoint).toContain('generate_lb_config "APP_API" "/api/" "api"')
+    expect(entrypoint).toContain('generate_lb_config "APP_BACKEND" "/backend/" "backend"')
+  })
 })

@@ -34,6 +34,12 @@ export default {
       operationFailed: 'Operation failed',
     },
   },
+  auth: {
+    title: 'System Admin Login',
+    login: 'Log In',
+    rootOnly: 'Only root users can access system-admin',
+    loginFailed: 'Login failed. Please try again.',
+  },
   layout: {
     title: 'System Admin',
     connecting: 'Connecting to main system...',
@@ -41,6 +47,9 @@ export default {
     noPermission: 'Insufficient permissions, please contact your administrator',
     permissionDenied: 'You do not have permission to access this page',
     permissionCheckFailed: 'Permission check failed, please try again later',
+    logout: 'Log Out',
+    rootOnlyDenied: 'Only root users can access system-admin',
+    sessionExpired: 'Your session expired. Please sign in again.',
   },
   permission: {
     title: 'Plugin Permission Management',

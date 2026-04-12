@@ -54,6 +54,15 @@
         </button>
         <h1 class="navbar-title">{{ $route.meta.title || '系统管理' }}</h1>
         <div class="navbar-spacer" />
+        <button
+          v-if="userInfo"
+          type="button"
+          class="logout-btn"
+          data-testid="logout-button"
+          @click="handleLogout"
+        >
+          {{ t('layout.logout') }}
+        </button>
         <div v-if="userInfo" class="user-info">
           <el-icon><User /></el-icon>
           <span>{{ userInfo.nickname || userInfo.username }}</span>
@@ -76,11 +85,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Close, Fold, Key, Grid, Menu, User, Loading } from '@element-plus/icons-vue'
-import api, { pluginApi } from '../api'
+import { pluginApi } from '../api'
 import { usePermissions } from '../composables/usePermissions'
+import { getRuntimeMode, removeAllTokens } from '../utils/token'
 
+const router = useRouter()
 const { t } = useI18n()
 const { fetchPermissions, can, hasAny, loaded } = usePermissions()
 
@@ -88,17 +100,33 @@ const sidebarOpen = ref(false)
 const userInfo = ref<{ username: string; nickname?: string; roles: string[] } | null>(null)
 const ready = ref(false)
 
+async function handleLogout() {
+  removeAllTokens()
+
+  if (getRuntimeMode() === 'embedded') {
+    window.location.reload()
+    return
+  }
+
+  await router.replace({ name: 'Login' })
+}
+
 onMounted(async () => {
   try {
     const [{ data }] = await Promise.all([
-      pluginApi.get('/verify-token'),
+      pluginApi.get('/verify-token', {
+        params: { plugin_name: 'system-admin' }
+      }),
       fetchPermissions(),
     ])
     if (data.code === 0) {
       userInfo.value = data.data
     }
-  } catch {
-    // 静默失败，不影响页面使用
+  } catch (error) {
+    const status = (error as { response?: { status?: number } })?.response?.status
+    if (status === 403) {
+      await router.replace({ name: 'NotAllowed', query: { reason: 'root' } })
+    }
   } finally {
     ready.value = true
   }
@@ -237,6 +265,21 @@ onMounted(async () => {
 }
 
 .navbar-spacer { flex: 1; }
+
+.logout-btn {
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.logout-btn:hover {
+  color: var(--text-primary);
+  background: var(--primary-light);
+}
 
 .user-info {
   display: flex;
