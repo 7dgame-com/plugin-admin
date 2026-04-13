@@ -205,4 +205,77 @@ describe('public API routes', () => {
       },
     });
   });
+
+  it('returns plugin actions for authenticated non-root users', async () => {
+    const app = createApp();
+
+    mockedAxios.get.mockResolvedValue({
+      data: {
+        code: 0,
+        message: 'ok',
+        data: {
+          id: 7,
+          username: 'alice',
+          roles: ['admin'],
+        },
+      },
+    } as never);
+
+    pluginPool.query.mockResolvedValue([
+      [{ action: 'list-users, manage-organizations' }],
+    ]);
+
+    const response = await request(app)
+      .get('/api/v1/plugin/allowed-actions')
+      .query({ plugin_name: 'user-management' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      code: 0,
+      message: 'ok',
+      data: {
+        actions: ['list-users', 'manage-organizations'],
+        user_id: 7,
+        roles: ['admin'],
+      },
+    });
+  });
+
+  it('proxies verify-token for authenticated non-root users', async () => {
+    const app = createApp();
+
+    mockedAxios.get.mockResolvedValue({
+      data: {
+        code: 0,
+        message: 'ok',
+        data: {
+          id: 7,
+          username: 'alice',
+          nickname: 'Alice',
+          roles: ['admin'],
+          organizations: [{ id: 2, name: 'acme', title: 'Acme Studio' }],
+        },
+      },
+      status: 200,
+      headers: {},
+    } as never);
+
+    const response = await request(app)
+      .get('/api/v1/plugin/verify-token')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      code: 0,
+      message: 'ok',
+      data: {
+        id: 7,
+        username: 'alice',
+        nickname: 'Alice',
+        roles: ['admin'],
+        organizations: [{ id: 2, name: 'acme', title: 'Acme Studio' }],
+      },
+    });
+  });
 });

@@ -6,13 +6,12 @@ import {
   verifyTokenProxy,
 } from '../controllers/publicApi';
 import { auth } from '../middleware/auth';
-import { requireRootRole } from '../middleware/root';
 
 const router = Router();
 
-router.get('/check-permission', auth, requireRootRole, checkPermission);
-router.get('/allowed-actions', auth, requireRootRole, allowedActions);
+router.get('/check-permission', auth, checkPermission);
+router.get('/allowed-actions', auth, allowedActions);
 router.get('/list', list);
-router.get('/verify-token', auth, requireRootRole, verifyTokenProxy);
+router.get('/verify-token', auth, verifyTokenProxy);
 
 export default router;
