@@ -66,6 +66,7 @@ type PluginRow = {
   enabled: number;
   order: number;
   allowed_origin: string | null;
+  allowed_host_origins?: string[] | string | null;
   version: string | null;
   organization_name: string | null;
 };
@@ -336,8 +337,9 @@ function installPluginListMock() {
         enabled: Number(params[6] ?? 1),
         order: Number(params[7] ?? 0),
         allowed_origin: (params[8] ?? null) as string | null,
-        version: (params[9] ?? null) as string | null,
-        organization_name: (params[10] ?? null) as string | null,
+        allowed_host_origins: (params[9] ?? null) as string | null,
+        version: (params[10] ?? null) as string | null,
+        organization_name: (params[11] ?? null) as string | null,
       };
       return [{ affectedRows: 1 }];
     }
@@ -371,6 +373,7 @@ function createPluginRow(
     enabled,
     order,
     allowed_origin: `https://${id}.example.com`,
+    allowed_host_origins: ['https://main.example.com'],
     version: '1.0.0',
     organization_name: organizationName,
   };
@@ -972,6 +975,7 @@ describe('property tests', () => {
               order: number;
               url: string;
               allowedOrigin: string | null;
+              allowedHostOrigins: string[];
               version: string | null;
             }>;
           };
@@ -1016,7 +1020,10 @@ describe('property tests', () => {
               expected ? JSON.parse(expected.name_i18n ?? 'null') : null
             );
             expect(plugin.url).toBe(expected?.url);
-            expect(plugin.allowedOrigin).toBe(expected?.allowed_origin ?? null);
+            expect(plugin.allowedOrigin).toBe(expected ? new URL(expected.url).origin : null);
+            expect(plugin.allowedHostOrigins).toEqual(
+              Array.isArray(expected?.allowed_host_origins) ? expected?.allowed_host_origins : []
+            );
             expect(plugin.version).toBe(expected?.version ?? null);
             expect(plugin.order).toBe(expected?.order);
             expect(plugin.group).toBe(

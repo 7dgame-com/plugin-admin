@@ -1,6 +1,10 @@
 import { Request, Response } from 'express';
-import { MutationResult, QueryRow, pluginPool } from '../db/pluginDb';
-import { encodeJsonField } from '../utils/pluginData';
+import { QueryRow, pluginPool } from '../db/pluginDb';
+import {
+  deriveOriginFromUrl,
+  encodeJsonField,
+  normalizeOriginList,
+} from '../utils/pluginData';
 import { error, paginated, success } from '../utils/response';
 
 type PluginRow = QueryRow & {
@@ -13,10 +17,27 @@ type PluginRow = QueryRow & {
   enabled: number;
   order: number;
   allowed_origin: string | null;
+  allowed_host_origins?: unknown;
   version: string | null;
   organization_name: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+};
+
+type NormalizedPluginPayload = {
+  id: unknown;
+  name: unknown;
+  url: string;
+  name_i18n: unknown;
+  description: unknown;
+  icon: unknown;
+  enabled: unknown;
+  order: unknown;
+  allowed_origin: string | null;
+  allowed_host_origins: string[];
+  allowed_host_origins_db: unknown;
+  version: unknown;
+  organization_name: unknown;
 };
 
 function asPositiveInt(value: unknown, fallback: number): number {
@@ -60,19 +81,34 @@ function handleDuplicateError(res: Response, err: unknown): boolean {
   return true;
 }
 
-function buildPluginPayload(body: Record<string, unknown>) {
+function buildPluginPayload(
+  body: Record<string, unknown>,
+  allowedHostOrigins: string[]
+): NormalizedPluginPayload {
+  const url = String(body.url ?? '');
+
   return {
     id: body.id,
     name: body.name,
-    url: body.url,
+    url,
     name_i18n: encodeJsonField(body.name_i18n),
     description: body.description ?? null,
     icon: body.icon ?? null,
     enabled: body.enabled ?? 1,
     order: body.order ?? 0,
-    allowed_origin: body.allowed_origin ?? null,
+    allowed_origin: deriveOriginFromUrl(url),
+    allowed_host_origins: allowedHostOrigins,
+    allowed_host_origins_db: encodeJsonField(allowedHostOrigins),
     version: body.version ?? null,
     organization_name: body.organization_name ?? null,
+  };
+}
+
+function serializePluginRow(row: PluginRow): PluginRow & { allowed_host_origins: string[] } {
+  return {
+    ...row,
+    allowed_origin: deriveOriginFromUrl(row.url) ?? row.allowed_origin,
+    allowed_host_origins: normalizeOriginList(row.allowed_host_origins).origins,
   };
 }
 
@@ -110,7 +146,7 @@ export async function listPlugins(req: Request, res: Response): Promise<void> {
       [...params, perPage, offset]
     );
 
-    res.json(paginated(rows, total, page, perPage));
+    res.json(paginated(rows.map(serializePluginRow), total, page, perPage));
   } catch (err) {
     const message = err instanceof Error ? err.message : '未知错误';
     res.status(500).json(error(5000, `数据库查询失败: ${message}`));
@@ -142,13 +178,26 @@ export async function createPlugin(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const payload = buildPluginPayload(req.body as Record<string, unknown>);
+  const { origins: allowedHostOrigins, invalidEntries } = normalizeOriginList(
+    req.body?.allowed_host_origins
+  );
+  if (invalidEntries.length > 0) {
+    res.status(400).json(
+      error(4001, `allowed_host_origins 中存在无效 URL: ${invalidEntries[0]}`)
+    );
+    return;
+  }
+
+  const payload = buildPluginPayload(
+    req.body as Record<string, unknown>,
+    allowedHostOrigins
+  );
 
   try {
     await pluginPool.query(
       `
         INSERT INTO plugins
-          (id, name, url, name_i18n, description, icon, enabled, \`order\`, allowed_origin, version, organization_name)
+          (id, name, url, name_i18n, description, icon, enabled, \`order\`, allowed_origin, allowed_host_origins, version, organization_name)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
@@ -161,12 +210,28 @@ export async function createPlugin(req: Request, res: Response): Promise<void> {
         payload.enabled,
         payload.order,
         payload.allowed_origin,
+        payload.allowed_host_origins_db,
         payload.version,
         payload.organization_name,
       ]
     );
 
-    res.json(success(payload));
+    res.json(
+      success({
+        id: payload.id,
+        name: payload.name,
+        url: payload.url,
+        name_i18n: payload.name_i18n,
+        description: payload.description,
+        icon: payload.icon,
+        enabled: payload.enabled,
+        order: payload.order,
+        allowed_origin: payload.allowed_origin,
+        allowed_host_origins: payload.allowed_host_origins,
+        version: payload.version,
+        organization_name: payload.organization_name,
+      })
+    );
   } catch (err) {
     if (handleDuplicateError(res, err)) {
       return;
@@ -208,7 +273,6 @@ export async function updatePlugin(req: Request, res: Response): Promise<void> {
       'icon',
       'enabled',
       'order',
-      'allowed_origin',
       'version',
       'organization_name',
     ] as const;
@@ -246,6 +310,27 @@ export async function updatePlugin(req: Request, res: Response): Promise<void> {
       updates.push(`\`${field}\` = ?`);
       params.push(value);
       responseData[field] = value;
+    }
+
+    if (req.body?.allowed_host_origins !== undefined) {
+      const { origins, invalidEntries } = normalizeOriginList(req.body.allowed_host_origins);
+      if (invalidEntries.length > 0) {
+        res.status(400).json(
+          error(4001, `allowed_host_origins 中存在无效 URL: ${invalidEntries[0]}`)
+        );
+        return;
+      }
+
+      updates.push('`allowed_host_origins` = ?');
+      params.push(encodeJsonField(origins));
+      responseData.allowed_host_origins = origins;
+    }
+
+    if (req.body?.url !== undefined) {
+      const derivedOrigin = deriveOriginFromUrl(String(req.body.url));
+      updates.push('`allowed_origin` = ?');
+      params.push(derivedOrigin);
+      responseData.allowed_origin = derivedOrigin;
     }
 
     if (updates.length > 0) {
