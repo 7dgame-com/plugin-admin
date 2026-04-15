@@ -120,6 +120,44 @@ describe('plugin-admin routes', () => {
     expect(pluginPool.query).not.toHaveBeenCalled();
   });
 
+  it('normalizes host allowlist entries and derives plugin origin from url during creation', async () => {
+    const app = createApp();
+
+    const response = await request(app)
+      .post('/api/v1/plugin-admin/create-plugin')
+      .set('Authorization', 'Bearer token')
+      .send({
+        id: 'demo-plugin',
+        name: 'Demo Plugin',
+        url: 'https://plugin.example.com/app/index.html',
+        allowed_host_origins: [
+          'https://main-a.example.com/admin',
+          'https://main-b.example.com',
+          'https://main-a.example.com/settings',
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(pluginPool.query).toHaveBeenCalledWith(
+      expect.stringContaining('allowed_host_origins'),
+      expect.arrayContaining([
+        'https://plugin.example.com',
+        JSON.stringify([
+          'https://main-a.example.com',
+          'https://main-b.example.com',
+        ]),
+      ])
+    );
+    expect(response.body.data).toMatchObject({
+      id: 'demo-plugin',
+      allowed_origin: 'https://plugin.example.com',
+      allowed_host_origins: [
+        'https://main-a.example.com',
+        'https://main-b.example.com',
+      ],
+    });
+  });
+
   it('returns plugin rows with organization_name and no legacy fields', async () => {
     const app = createApp();
 
@@ -137,6 +175,8 @@ describe('plugin-admin routes', () => {
             enabled: 1,
             order: 1,
             allowed_origin: 'https://system-admin.plugins.xrugc.com',
+            allowed_host_origins:
+              '["https://main-a.xrugc.com","https://main-b.xrugc.com"]',
             version: '1.0.0',
             organization_name: null,
           },
@@ -151,6 +191,11 @@ describe('plugin-admin routes', () => {
     expect(response.body.data.items[0]).toMatchObject({
       id: 'system-admin',
       organization_name: null,
+      allowed_origin: 'https://system-admin.plugins.xrugc.com',
+      allowed_host_origins: [
+        'https://main-a.xrugc.com',
+        'https://main-b.xrugc.com',
+      ],
     });
     expect(response.body.data.items[0].domain).toBeUndefined();
     expect(response.body.data.items[0].group_id).toBeUndefined();

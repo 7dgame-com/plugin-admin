@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 import { QueryRow, pluginPool } from '../db/pluginDb';
 import { AuthenticatedRequest, UserOrganizationSummary, verifyBearerToken } from '../middleware/auth';
 import { getAllowedActions, hasPermission } from '../middleware/permission';
-import { decodeJsonField } from '../utils/pluginData';
+import { decodeJsonField, deriveOriginFromUrl, normalizeOriginList } from '../utils/pluginData';
 import { error, success } from '../utils/response';
 
 const MAIN_API_URL = process.env.MAIN_API_URL || 'http://localhost:8081';
@@ -19,6 +19,7 @@ type PluginRow = QueryRow & {
   enabled: number;
   order: number;
   allowed_origin: string | null;
+  allowed_host_origins?: unknown;
   version: string | null;
   organization_name: string | null;
 };
@@ -160,7 +161,8 @@ export async function list(req: Request, res: Response): Promise<void> {
         group: plugin.organization_name ? `org:${plugin.organization_name}` : 'org:public',
         enabled: Boolean(plugin.enabled),
         order: Number(plugin.order),
-        allowedOrigin: plugin.allowed_origin,
+        allowedOrigin: deriveOriginFromUrl(plugin.url) ?? plugin.allowed_origin,
+        allowedHostOrigins: normalizeOriginList(plugin.allowed_host_origins).origins,
         version: plugin.version,
       })),
     });
