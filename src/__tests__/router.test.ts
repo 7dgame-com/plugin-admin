@@ -1,13 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+const mockError = vi.fn()
 const mockGetToken = vi.fn()
 const mockGetRuntimeMode = vi.fn()
 const mockFetchPermissions = vi.fn()
-const mockCan = vi.fn()
+const mockCan = vi.fn<(permission: string) => boolean>()
 const permissionState = {
   loaded: { value: true },
   loading: { value: false },
 }
+
+vi.mock('element-plus', () => ({
+  ElMessage: {
+    error: (...args: unknown[]) => mockError(...args),
+  },
+}))
 
 vi.mock('../utils/token', () => ({
   getToken: () => mockGetToken(),
@@ -19,7 +26,7 @@ vi.mock('../composables/usePermissions', () => ({
     loaded: permissionState.loaded,
     loading: permissionState.loading,
     fetchPermissions: mockFetchPermissions,
-    can: mockCan,
+    can: (permission: string) => mockCan(permission),
     hasAny: () => true,
   }),
 }))
@@ -30,12 +37,13 @@ vi.mock('../views/ApiDiagnostics.vue', () => ({ default: { template: '<div>ApiDi
 vi.mock('../layout/AppLayout.vue', () => ({ default: { template: '<div><router-view /></div>' } }))
 vi.mock('../views/PermissionList.vue', () => ({ default: { template: '<div>PermissionList</div>' } }))
 vi.mock('../views/PluginList.vue', () => ({ default: { template: '<div>PluginList</div>' } }))
-vi.mock('../views/MenuGroupList.vue', () => ({ default: { template: '<div>MenuGroupList</div>' } }))
+vi.mock('../views/OrganizationList.vue', () => ({ default: { template: '<div>OrganizationList</div>' } }))
 
 import router from '../router/index'
 
 describe('router auth guards', () => {
   beforeEach(async () => {
+    mockError.mockReset()
     mockGetToken.mockReset()
     mockGetRuntimeMode.mockReset()
     mockFetchPermissions.mockReset()
@@ -85,5 +93,53 @@ describe('router auth guards', () => {
 
     expect(mockFetchPermissions).toHaveBeenCalledTimes(1)
     expect(router.currentRoute.value.name).toBe('PermissionList')
+  })
+})
+
+describe('router organization migration', () => {
+  beforeEach(() => {
+    mockError.mockReset()
+    mockCan.mockReset()
+    mockGetToken.mockReturnValue('token')
+    mockGetRuntimeMode.mockReturnValue('standalone')
+    permissionState.loaded.value = true
+    mockFetchPermissions.mockReset()
+  })
+
+  it('registers the organization management route and removes the legacy menu-group route', () => {
+    const routePaths = router.getRoutes().map((route) => route.path)
+
+    expect(routePaths).toContain('/organizations')
+    expect(routePaths).not.toContain('/menu-groups')
+  })
+
+  it('protects the organization route with manage-organizations', async () => {
+    mockCan.mockReturnValue(false)
+
+    const { permissionGuard } = await import('../router/index')
+    const result = await permissionGuard(
+      { meta: { requiresPermission: 'manage-organizations' }, fullPath: '/organizations' },
+      { name: 'PluginList' },
+    )
+
+    expect(mockCan).toHaveBeenCalledWith('manage-organizations')
+    expect(mockError).toHaveBeenCalledTimes(1)
+    expect(result).toBe(false)
+  })
+
+  it('allows first-load navigation even before the permission payload finishes hydrating', async () => {
+    permissionState.loaded.value = false
+    mockCan.mockReturnValue(false)
+    mockFetchPermissions.mockResolvedValue(undefined)
+
+    const { permissionGuard } = await import('../router/index')
+    const result = await permissionGuard(
+      { meta: { requiresPermission: 'manage-organizations' }, fullPath: '/organizations' },
+      { name: undefined },
+    )
+
+    expect(mockFetchPermissions).toHaveBeenCalledTimes(1)
+    expect(result).toBe(true)
+    expect(mockError).not.toHaveBeenCalled()
   })
 })

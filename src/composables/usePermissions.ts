@@ -4,11 +4,13 @@ import { pluginApi } from '../api'
 export interface Permissions {
   'manage-permissions': boolean
   'manage-plugins': boolean
+  'manage-organizations': boolean
 }
 
 const permissions = ref<Permissions>({
   'manage-permissions': false,
   'manage-plugins': false,
+  'manage-organizations': false,
 })
 
 const loaded = ref(false)
@@ -34,6 +36,7 @@ export function usePermissions() {
           const allActions: (keyof Permissions)[] = [
             'manage-permissions',
             'manage-plugins',
+            'manage-organizations',
           ]
           const hasWildcard = allowedActions.includes('*')
           allActions.forEach((a) => {

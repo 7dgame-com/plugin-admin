@@ -73,6 +73,7 @@ describe('auth middleware', () => {
       userId: 9,
       username: 'alice',
       roles: ['admin'],
+      organizations: [],
     });
   });
 

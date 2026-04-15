@@ -1,22 +1,13 @@
 import axios from 'axios';
 import { Request, Response } from 'express';
 import { QueryRow, pluginPool } from '../db/pluginDb';
-import { AuthenticatedRequest } from '../middleware/auth';
+import { AuthenticatedRequest, UserOrganizationSummary, verifyBearerToken } from '../middleware/auth';
 import { getAllowedActions, hasPermission } from '../middleware/permission';
-import { decodeJsonField, mergeById } from '../utils/pluginData';
+import { decodeJsonField } from '../utils/pluginData';
 import { error, success } from '../utils/response';
 
 const MAIN_API_URL = process.env.MAIN_API_URL || 'http://localhost:8081';
 const MAIN_API_TIMEOUT_MS = Number(process.env.MAIN_API_TIMEOUT_MS || 5000);
-
-type MenuGroupRow = QueryRow & {
-  id: string;
-  name: string;
-  name_i18n: string | null;
-  icon: string | null;
-  order: number;
-  domain: string | null;
-};
 
 type PluginRow = QueryRow & {
   id: string;
@@ -25,12 +16,11 @@ type PluginRow = QueryRow & {
   description: string | null;
   url: string;
   icon: string | null;
-  group_id: string | null;
   enabled: number;
   order: number;
   allowed_origin: string | null;
   version: string | null;
-  domain: string | null;
+  organization_name: string | null;
 };
 
 export async function checkPermission(req: Request, res: Response): Promise<void> {
@@ -76,63 +66,90 @@ export async function allowedActions(req: Request, res: Response): Promise<void>
 }
 
 export async function list(req: Request, res: Response): Promise<void> {
-  const domain = typeof req.query.domain === 'string' && req.query.domain.trim() !== ''
-    ? req.query.domain.trim()
-    : null;
+  const authorization = req.headers?.authorization;
+  let organizations: UserOrganizationSummary[] = [];
+
+  if (authorization !== undefined) {
+    if (!authorization.startsWith('Bearer ')) {
+      res.status(401).json(error(1001, 'Token 无效或已过期'));
+      return;
+    }
+
+    const token = authorization.slice(7).trim();
+    if (token === '') {
+      res.status(401).json(error(1001, 'Token 无效或已过期'));
+      return;
+    }
+
+    try {
+      const user = await verifyBearerToken(token);
+      if (!user) {
+        res.status(401).json(error(1001, 'Token 无效或已过期'));
+        return;
+      }
+      organizations = user.organizations ?? [];
+    } catch (err) {
+      if (axios.isAxiosError(err) && (err.response?.status === 401 || err.response?.status === 403)) {
+        res.status(401).json(error(1001, 'Token 无效或已过期'));
+        return;
+      }
+
+      const message = err instanceof Error ? err.message : '未知错误';
+      res.status(502).json(error(1001, `调用 verify-token 失败: ${message}`));
+      return;
+    }
+  }
 
   try {
-    const [generalGroups] = await pluginPool.query<MenuGroupRow[]>(
-      `
-        SELECT *
-        FROM plugin_menu_groups
-        WHERE domain IS NULL
-        ORDER BY \`order\` ASC
-      `
+    const organizationNames = Array.from(
+      new Set(
+        organizations
+          .map((organization) => organization.name.trim())
+          .filter((name) => name.length > 0)
+      )
     );
-    const [domainGroups] = domain
-      ? await pluginPool.query<MenuGroupRow[]>(
-          `
-            SELECT *
-            FROM plugin_menu_groups
-            WHERE domain = ?
-            ORDER BY \`order\` ASC
-          `,
-          [domain]
-        )
-      : [[] as MenuGroupRow[]];
 
-    const [generalPlugins] = await pluginPool.query<PluginRow[]>(
-      `
-        SELECT *
-        FROM plugins
-        WHERE domain IS NULL AND enabled = 1
-        ORDER BY \`order\` ASC
-      `
-    );
-    const [domainPlugins] = domain
+    const [plugins] = organizationNames.length > 0
       ? await pluginPool.query<PluginRow[]>(
           `
             SELECT *
             FROM plugins
-            WHERE domain = ? AND enabled = 1
+            WHERE enabled = 1
+              AND (organization_name IS NULL OR organization_name IN (${organizationNames.map(() => '?').join(', ')}))
             ORDER BY \`order\` ASC
           `,
-          [domain]
+          organizationNames
         )
-      : [[] as PluginRow[]];
+      : await pluginPool.query<PluginRow[]>(
+          `
+            SELECT *
+            FROM plugins
+            WHERE enabled = 1
+              AND organization_name IS NULL
+            ORDER BY \`order\` ASC
+          `
+        );
 
-    const groups = mergeById(generalGroups, domainGroups);
-    const plugins = mergeById(generalPlugins, domainPlugins);
+    const menuGroups = [
+      {
+        id: 'org:public',
+        name: '公共插件',
+        nameI18n: null,
+        icon: 'Grid',
+        order: 0,
+      },
+      ...organizations.map((organization, index) => ({
+        id: `org:${organization.name}`,
+        name: organization.title || organization.name,
+        nameI18n: null,
+        icon: 'OfficeBuilding',
+        order: index + 1,
+      })),
+    ];
 
     res.json({
       version: '1.0.0',
-      menuGroups: groups.map((group) => ({
-        id: group.id,
-        name: group.name,
-        nameI18n: decodeJsonField(group.name_i18n),
-        icon: group.icon,
-        order: Number(group.order),
-      })),
+      menuGroups,
       plugins: plugins.map((plugin) => ({
         id: plugin.id,
         name: plugin.name,
@@ -140,7 +157,7 @@ export async function list(req: Request, res: Response): Promise<void> {
         description: plugin.description,
         url: plugin.url,
         icon: plugin.icon,
-        group: plugin.group_id,
+        group: plugin.organization_name ? `org:${plugin.organization_name}` : 'org:public',
         enabled: Boolean(plugin.enabled),
         order: Number(plugin.order),
         allowedOrigin: plugin.allowed_origin,

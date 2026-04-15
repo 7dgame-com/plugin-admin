@@ -43,7 +43,7 @@ describe('root admission on mounted routes', () => {
     mockedAxios.get.mockReset();
   });
 
-  it('blocks non-root users from /api/v1/plugin/verify-token', async () => {
+  it('lets non-root users through to /api/v1/plugin/verify-token', async () => {
     mockedAxios.get.mockResolvedValue({
       data: {
         code: 0,
@@ -54,6 +54,8 @@ describe('root admission on mounted routes', () => {
           roles: ['admin'],
         },
       },
+      status: 200,
+      headers: {},
     } as never);
 
     const response = await request(createApp())
@@ -61,11 +63,8 @@ describe('root admission on mounted routes', () => {
       .query({ plugin_name: 'system-admin' })
       .set('Authorization', 'Bearer token');
 
-    expect(response.status).toBe(403);
-    expect(response.body).toEqual({
-      code: 2004,
-      message: '仅 root 可访问 system-admin',
-    });
+    expect(response.status).toBe(200);
+    expect(response.body.data.roles).toEqual(['admin']);
   });
 
   it('lets root users through to /api/v1/plugin/allowed-actions', async () => {

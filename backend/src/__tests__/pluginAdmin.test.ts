@@ -120,28 +120,49 @@ describe('plugin-admin routes', () => {
     expect(pluginPool.query).not.toHaveBeenCalled();
   });
 
-  it('returns menu groups ordered payloads', async () => {
+  it('returns plugin rows with organization_name and no legacy fields', async () => {
     const app = createApp();
 
-    pluginPool.query.mockResolvedValue([
-      [
-        { id: 'admin', name: '系统管理', name_i18n: '{"zh-CN":"系统管理"}', icon: 'Setting', order: 99, domain: null },
-      ],
-    ]);
+    pluginPool.query
+      .mockResolvedValueOnce([[{ total: 1 }]])
+      .mockResolvedValueOnce([
+        [
+          {
+            id: 'system-admin',
+            name: '系统管理',
+            name_i18n: '{"zh-CN":"系统管理"}',
+            description: 'desc',
+            url: 'https://system-admin.plugins.xrugc.com/',
+            icon: 'Setting',
+            enabled: 1,
+            order: 1,
+            allowed_origin: 'https://system-admin.plugins.xrugc.com',
+            version: '1.0.0',
+            organization_name: null,
+          },
+        ],
+      ]);
+
+    const response = await request(app)
+      .get('/api/v1/plugin-admin/plugins')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.items[0]).toMatchObject({
+      id: 'system-admin',
+      organization_name: null,
+    });
+    expect(response.body.data.items[0].domain).toBeUndefined();
+    expect(response.body.data.items[0].group_id).toBeUndefined();
+  });
+
+  it('does not mount legacy menu-group routes anymore', async () => {
+    const app = createApp();
 
     const response = await request(app)
       .get('/api/v1/plugin-admin/menu-groups')
       .set('Authorization', 'Bearer token');
 
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual({
-      code: 0,
-      message: 'ok',
-      data: {
-        items: [
-          { id: 'admin', name: '系统管理', name_i18n: '{"zh-CN":"系统管理"}', icon: 'Setting', order: 99, domain: null },
-        ],
-      },
-    });
+    expect(response.status).toBe(404);
   });
 });

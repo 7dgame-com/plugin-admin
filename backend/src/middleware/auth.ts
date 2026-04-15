@@ -4,11 +4,18 @@ import { NextFunction, Request, Response } from 'express';
 const MAIN_API_URL = process.env.MAIN_API_URL || 'http://localhost:8081';
 const MAIN_API_TIMEOUT_MS = Number(process.env.MAIN_API_TIMEOUT_MS || 5000);
 
+export interface UserOrganizationSummary {
+  id: number;
+  name: string;
+  title: string;
+}
+
 export interface UserInfo {
   userId: number;
   username?: string;
   nickname?: string;
   roles: string[];
+  organizations: UserOrganizationSummary[];
   [key: string]: unknown;
 }
 
@@ -20,6 +27,33 @@ function invalidTokenResponse(res: Response) {
   res.status(401).json({
     code: 1001,
     message: 'Token 无效或已过期',
+  });
+}
+
+function parseOrganizations(rawOrganizations: unknown): UserOrganizationSummary[] {
+  if (!Array.isArray(rawOrganizations)) {
+    return [];
+  }
+
+  return rawOrganizations.flatMap((organization) => {
+    if (!organization || typeof organization !== 'object') {
+      return [];
+    }
+
+    const rawId = (organization as { id?: unknown }).id;
+    const id = Number(rawId);
+    const name = (organization as { name?: unknown }).name;
+    const title = (organization as { title?: unknown }).title;
+
+    if (!Number.isInteger(id) || id <= 0 || typeof name !== 'string' || name.trim() === '') {
+      return [];
+    }
+
+    return [{
+      id,
+      name: name.trim(),
+      title: typeof title === 'string' && title.trim() !== '' ? title.trim() : name.trim(),
+    }];
   });
 }
 
@@ -49,6 +83,7 @@ export async function verifyBearerToken(token: string): Promise<UserInfo | null>
     username: typeof payload?.username === 'string' ? payload.username : undefined,
     nickname: typeof payload?.nickname === 'string' ? payload.nickname : undefined,
     roles,
+    organizations: parseOrganizations(payload?.organizations),
   };
 }
 
