@@ -386,6 +386,10 @@ export const openApiDocument = {
           enabled: { type: 'integer' },
           order: { type: 'integer' },
           allowed_origin: { type: 'string', nullable: true },
+          allowed_host_origins: {
+            type: 'array',
+            items: { type: 'string' },
+          },
           version: { type: 'string', nullable: true },
           organization_name: { type: 'string', nullable: true },
           created_at: { type: 'string', nullable: true },
@@ -435,6 +439,10 @@ export const openApiDocument = {
           enabled: { type: 'integer' },
           order: { type: 'integer' },
           allowed_origin: { type: 'string', nullable: true },
+          allowed_host_origins: {
+            type: 'array',
+            items: { type: 'string' },
+          },
           version: { type: 'string', nullable: true },
           organization_name: { type: 'string', nullable: true },
         },
@@ -452,6 +460,10 @@ export const openApiDocument = {
           enabled: { type: 'integer' },
           order: { type: 'integer' },
           allowed_origin: { type: 'string', nullable: true },
+          allowed_host_origins: {
+            type: 'array',
+            items: { type: 'string' },
+          },
           version: { type: 'string', nullable: true },
           organization_name: { type: 'string', nullable: true },
         },
@@ -529,6 +541,10 @@ export const openApiDocument = {
           enabled: { type: 'boolean' },
           order: { type: 'integer' },
           allowedOrigin: { type: 'string', nullable: true },
+          allowedHostOrigins: {
+            type: 'array',
+            items: { type: 'string' },
+          },
           version: { type: 'string', nullable: true },
         },
       },

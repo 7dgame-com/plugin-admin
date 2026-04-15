@@ -79,8 +79,28 @@
         <el-form-item :label="t('common.version')">
           <el-input v-model="form.version" :placeholder="t('plugin.versionPlaceholder')" />
         </el-form-item>
-        <el-form-item :label="t('plugin.allowedOrigin')">
-          <el-input v-model="form.allowed_origin" :placeholder="t('plugin.allowedOriginPlaceholder')" />
+        <el-form-item :label="t('plugin.pluginOrigin')">
+          <el-input
+            :model-value="derivedPluginOrigin"
+            :placeholder="t('plugin.pluginOriginPlaceholder')"
+            disabled
+          />
+        </el-form-item>
+        <el-form-item :label="t('plugin.allowedHostOrigins')">
+          <el-select
+            v-model="form.allowed_host_origins"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            clearable
+            collapse-tags
+            collapse-tags-tooltip
+            :reserve-keyword="false"
+            style="width: 100%"
+            :placeholder="t('plugin.allowedHostOriginsPlaceholder')"
+          />
+          <div class="form-hint">{{ t('plugin.allowedHostOriginsHint') }}</div>
         </el-form-item>
         <el-form-item :label="t('common.description')">
           <el-input v-model="form.description" type="textarea" :rows="2" />
@@ -95,7 +115,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -121,6 +141,7 @@ interface PluginItem {
   order: number
   description: string | null
   allowed_origin: string | null
+  allowed_host_origins?: string[]
 }
 
 const loading = ref(false)
@@ -142,7 +163,7 @@ const form = reactive({
   enabled: true,
   order: 0,
   version: '',
-  allowed_origin: '',
+  allowed_host_origins: [] as string[],
   description: '',
 })
 
@@ -160,6 +181,30 @@ function getOrganizationLabel(organizationName: string | null) {
   const organization = organizations.value.find((item) => item.name === organizationName)
   return organization?.title || organizationName
 }
+
+function getOriginFromUrl(value: string) {
+  try {
+    return new URL(value).origin
+  } catch {
+    return ''
+  }
+}
+
+function normalizeOriginList(values: string[]) {
+  const seen = new Set<string>()
+  const origins: string[] = []
+
+  values.forEach((value) => {
+    const origin = getOriginFromUrl(value.trim())
+    if (!origin || seen.has(origin)) return
+    seen.add(origin)
+    origins.push(origin)
+  })
+
+  return origins
+}
+
+const derivedPluginOrigin = computed(() => getOriginFromUrl(form.url))
 
 async function loadData() {
   loading.value = true
@@ -205,7 +250,7 @@ function resetForm() {
     enabled: true,
     order: 0,
     version: '',
-    allowed_origin: '',
+    allowed_host_origins: [],
     description: '',
   })
 }
@@ -227,7 +272,7 @@ function openEditDialog(row: PluginItem) {
     enabled: !!row.enabled,
     order: row.order,
     version: row.version || '',
-    allowed_origin: row.allowed_origin || '',
+    allowed_host_origins: row.allowed_host_origins || [],
     description: row.description || '',
   })
   dialogVisible.value = true
@@ -241,10 +286,20 @@ async function handleSubmit() {
 
     submitting.value = true
     try {
+      const invalidAllowedHostOrigin = form.allowed_host_origins.find((value) => {
+        const trimmed = value.trim()
+        return trimmed !== '' && getOriginFromUrl(trimmed) === ''
+      })
+      if (invalidAllowedHostOrigin) {
+        ElMessage.error(t('plugin.messages.allowedHostOriginInvalid'))
+        return
+      }
+
       const payload = {
         ...form,
         enabled: form.enabled ? 1 : 0,
         organization_name: form.organization_name || null,
+        allowed_host_origins: normalizeOriginList(form.allowed_host_origins),
       }
 
       if (editingId.value) {
@@ -314,5 +369,12 @@ onMounted(() => {
 .pagination {
   margin-top: var(--spacing-md);
   justify-content: flex-end;
+}
+
+.form-hint {
+  margin-top: 6px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
 }
 </style>
