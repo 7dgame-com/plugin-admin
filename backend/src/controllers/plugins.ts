@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { QueryRow, pluginPool } from '../db/pluginDb';
+import { hasPluginOrganizationNameColumn } from '../db/pluginSchema';
 import {
   deriveOriginFromUrl,
   encodeJsonField,
@@ -18,6 +19,23 @@ type PluginRow = QueryRow & {
   order: number;
   allowed_origin: string | null;
   allowed_host_origins?: unknown;
+  version: string | null;
+  organization_name: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+type SerializedPluginRow = {
+  id: string;
+  name: string;
+  name_i18n: string | null;
+  description: string | null;
+  url: string;
+  icon: string | null;
+  enabled: number;
+  order: number;
+  allowed_origin: string | null;
+  allowed_host_origins: string[];
   version: string | null;
   organization_name: string | null;
   created_at?: string | null;
@@ -104,11 +122,22 @@ function buildPluginPayload(
   };
 }
 
-function serializePluginRow(row: PluginRow): PluginRow & { allowed_host_origins: string[] } {
+function serializePluginRow(row: PluginRow): SerializedPluginRow {
   return {
-    ...row,
+    id: row.id,
+    name: row.name,
+    name_i18n: row.name_i18n,
+    description: row.description,
+    url: row.url,
+    icon: row.icon,
+    enabled: row.enabled,
+    order: row.order,
     allowed_origin: deriveOriginFromUrl(row.url) ?? row.allowed_origin,
     allowed_host_origins: normalizeOriginList(row.allowed_host_origins).origins,
+    version: row.version,
+    organization_name: row.organization_name ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
   };
 }
 
@@ -119,16 +148,16 @@ export async function listPlugins(req: Request, res: Response): Promise<void> {
   const page = asPositiveInt(req.query.page, 1);
   const perPage = asPositiveInt(req.query.per_page, 20);
 
-  const filters: string[] = [];
-  const params: unknown[] = [];
-  if (organizationName !== '') {
-    filters.push('organization_name = ?');
-    params.push(organizationName);
-  }
-
-  const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
-
   try {
+    const hasOrganizationNameColumn = await hasPluginOrganizationNameColumn();
+    const filters: string[] = [];
+    const params: unknown[] = [];
+    if (hasOrganizationNameColumn && organizationName !== '') {
+      filters.push('organization_name = ?');
+      params.push(organizationName);
+    }
+
+    const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
     const [countRows] = await pluginPool.query<QueryRow[]>(
       `SELECT COUNT(*) AS total FROM plugins ${whereClause}`,
       params
@@ -194,26 +223,46 @@ export async function createPlugin(req: Request, res: Response): Promise<void> {
   );
 
   try {
+    const hasOrganizationNameColumn = await hasPluginOrganizationNameColumn();
+    const columns = [
+      'id',
+      'name',
+      'url',
+      'name_i18n',
+      'description',
+      'icon',
+      'enabled',
+      '`order`',
+      'allowed_origin',
+      'allowed_host_origins',
+      'version',
+    ];
+    const values: unknown[] = [
+      payload.id,
+      payload.name,
+      payload.url,
+      payload.name_i18n,
+      payload.description,
+      payload.icon,
+      payload.enabled,
+      payload.order,
+      payload.allowed_origin,
+      payload.allowed_host_origins_db,
+      payload.version,
+    ];
+
+    if (hasOrganizationNameColumn) {
+      columns.push('organization_name');
+      values.push(payload.organization_name);
+    }
+
     await pluginPool.query(
       `
         INSERT INTO plugins
-          (id, name, url, name_i18n, description, icon, enabled, \`order\`, allowed_origin, allowed_host_origins, version, organization_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (${columns.join(', ')})
+        VALUES (${columns.map(() => '?').join(', ')})
       `,
-      [
-        payload.id,
-        payload.name,
-        payload.url,
-        payload.name_i18n,
-        payload.description,
-        payload.icon,
-        payload.enabled,
-        payload.order,
-        payload.allowed_origin,
-        payload.allowed_host_origins_db,
-        payload.version,
-        payload.organization_name,
-      ]
+      values
     );
 
     res.json(
@@ -229,7 +278,7 @@ export async function createPlugin(req: Request, res: Response): Promise<void> {
         allowed_origin: payload.allowed_origin,
         allowed_host_origins: payload.allowed_host_origins,
         version: payload.version,
-        organization_name: payload.organization_name,
+        organization_name: hasOrganizationNameColumn ? payload.organization_name : null,
       })
     );
   } catch (err) {
@@ -251,6 +300,7 @@ export async function updatePlugin(req: Request, res: Response): Promise<void> {
   }
 
   try {
+    const hasOrganizationNameColumn = await hasPluginOrganizationNameColumn();
     const [existingRows] = await pluginPool.query<PluginRow[]>(
       `
         SELECT *
@@ -274,14 +324,16 @@ export async function updatePlugin(req: Request, res: Response): Promise<void> {
       'enabled',
       'order',
       'version',
-      'organization_name',
     ] as const;
+    const mutableFields = hasOrganizationNameColumn
+      ? [...fieldNames, 'organization_name'] as const
+      : fieldNames;
 
     const updates: string[] = [];
     const params: unknown[] = [];
     const responseData: Record<string, unknown> = { id };
 
-    for (const field of fieldNames) {
+    for (const field of mutableFields) {
       if (req.body?.[field] === undefined) {
         continue;
       }
@@ -310,6 +362,10 @@ export async function updatePlugin(req: Request, res: Response): Promise<void> {
       updates.push(`\`${field}\` = ?`);
       params.push(value);
       responseData[field] = value;
+    }
+
+    if (!hasOrganizationNameColumn && req.body?.organization_name !== undefined) {
+      responseData.organization_name = null;
     }
 
     if (req.body?.allowed_host_origins !== undefined) {

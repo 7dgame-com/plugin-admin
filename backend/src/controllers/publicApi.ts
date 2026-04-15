@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { Request, Response } from 'express';
 import { QueryRow, pluginPool } from '../db/pluginDb';
+import { hasPluginOrganizationNameColumn } from '../db/pluginSchema';
 import { AuthenticatedRequest, UserOrganizationSummary, verifyBearerToken } from '../middleware/auth';
 import { getAllowedActions, hasPermission } from '../middleware/permission';
 import { decodeJsonField, deriveOriginFromUrl, normalizeOriginList } from '../utils/pluginData';
@@ -102,6 +103,7 @@ export async function list(req: Request, res: Response): Promise<void> {
   }
 
   try {
+    const hasOrganizationNameColumn = await hasPluginOrganizationNameColumn();
     const organizationNames = Array.from(
       new Set(
         organizations
@@ -109,27 +111,39 @@ export async function list(req: Request, res: Response): Promise<void> {
           .filter((name) => name.length > 0)
       )
     );
+    let plugins: PluginRow[];
 
-    const [plugins] = organizationNames.length > 0
-      ? await pluginPool.query<PluginRow[]>(
-          `
-            SELECT *
-            FROM plugins
-            WHERE enabled = 1
-              AND (organization_name IS NULL OR organization_name IN (${organizationNames.map(() => '?').join(', ')}))
-            ORDER BY \`order\` ASC
-          `,
-          organizationNames
-        )
-      : await pluginPool.query<PluginRow[]>(
-          `
-            SELECT *
-            FROM plugins
-            WHERE enabled = 1
-              AND organization_name IS NULL
-            ORDER BY \`order\` ASC
-          `
-        );
+    if (hasOrganizationNameColumn && organizationNames.length > 0) {
+      [plugins] = await pluginPool.query<PluginRow[]>(
+        `
+          SELECT *
+          FROM plugins
+          WHERE enabled = 1
+            AND (organization_name IS NULL OR organization_name IN (${organizationNames.map(() => '?').join(', ')}))
+          ORDER BY \`order\` ASC
+        `,
+        organizationNames
+      );
+    } else if (hasOrganizationNameColumn) {
+      [plugins] = await pluginPool.query<PluginRow[]>(
+        `
+          SELECT *
+          FROM plugins
+          WHERE enabled = 1
+            AND organization_name IS NULL
+          ORDER BY \`order\` ASC
+        `
+      );
+    } else {
+      [plugins] = await pluginPool.query<PluginRow[]>(
+        `
+          SELECT *
+          FROM plugins
+          WHERE enabled = 1
+          ORDER BY \`order\` ASC
+        `
+      );
+    }
 
     const menuGroups = [
       {
@@ -139,13 +153,17 @@ export async function list(req: Request, res: Response): Promise<void> {
         icon: 'Grid',
         order: 0,
       },
-      ...organizations.map((organization, index) => ({
-        id: `org:${organization.name}`,
-        name: organization.title || organization.name,
-        nameI18n: null,
-        icon: 'OfficeBuilding',
-        order: index + 1,
-      })),
+      ...(
+        hasOrganizationNameColumn
+          ? organizations.map((organization, index) => ({
+              id: `org:${organization.name}`,
+              name: organization.title || organization.name,
+              nameI18n: null,
+              icon: 'OfficeBuilding',
+              order: index + 1,
+          }))
+          : []
+      ),
     ];
 
     res.json({
@@ -158,7 +176,9 @@ export async function list(req: Request, res: Response): Promise<void> {
         description: plugin.description,
         url: plugin.url,
         icon: plugin.icon,
-        group: plugin.organization_name ? `org:${plugin.organization_name}` : 'org:public',
+        group: hasOrganizationNameColumn && plugin.organization_name
+          ? `org:${plugin.organization_name}`
+          : 'org:public',
         enabled: Boolean(plugin.enabled),
         order: Number(plugin.order),
         allowedOrigin: deriveOriginFromUrl(plugin.url) ?? plugin.allowed_origin,

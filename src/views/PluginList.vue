@@ -127,6 +127,7 @@ import {
   updatePlugin,
   type OrganizationItem,
 } from '../api'
+import { notifyHostPluginRegistryChanged } from '../utils/hostEvents'
 
 const { t } = useI18n()
 
@@ -306,6 +307,7 @@ async function handleSubmit() {
         const { data } = await updatePlugin(payload)
         if (data.code === 0) {
           ElMessage.success(t('common.messages.updateSuccess'))
+          notifyHostPluginRegistryChanged()
           dialogVisible.value = false
           loadData()
         } else {
@@ -315,6 +317,7 @@ async function handleSubmit() {
         const { data } = await createPlugin(payload)
         if (data.code === 0) {
           ElMessage.success(t('common.messages.createSuccess'))
+          notifyHostPluginRegistryChanged()
           dialogVisible.value = false
           loadData()
         } else {
@@ -339,6 +342,7 @@ async function handleDelete(row: PluginItem) {
     const { data } = await deletePlugin(row.id)
     if (data.code === 0) {
       ElMessage.success(t('common.messages.deleteSuccess'))
+      notifyHostPluginRegistryChanged()
       loadData()
     } else {
       ElMessage.error(data.message || t('common.messages.operationFailed'))
