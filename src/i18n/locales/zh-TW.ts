@@ -1,7 +1,7 @@
 export default {
   pluginMeta: {
     name: '系統管理',
-    description: '外掛權限、註冊與組織管理工具',
+    description: '外掛權限、註冊與組織唯讀總覽工具',
     groupName: '系統',
   },
   common: {
@@ -102,6 +102,7 @@ export default {
     organizationName: '組織英文名',
     organizationTitlePlaceholder: '組織顯示名稱',
     organizationNamePlaceholder: '如: acme-studio',
+    readonlyHint: '此頁面僅用於查看全部組織；新增、編輯與使用者組織維護請前往 user-management。',
     binding: '組織歸屬',
     bindingPlaceholder: '選擇組織',
     publicOption: '公共外掛',

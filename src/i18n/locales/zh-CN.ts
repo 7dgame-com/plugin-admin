@@ -1,7 +1,7 @@
 export default {
   pluginMeta: {
     name: '系统管理',
-    description: '插件权限、注册与组织管理工具',
+    description: '插件权限、注册与组织只读总览工具',
     groupName: '系统',
   },
   common: {
@@ -102,6 +102,7 @@ export default {
     organizationName: '组织英文名',
     organizationTitlePlaceholder: '组织显示名称',
     organizationNamePlaceholder: '如: acme-studio',
+    readonlyHint: '此页面仅用于查看全部组织；新增、编辑和用户组织维护请前往 user-management。',
     binding: '组织归属',
     bindingPlaceholder: '选择组织',
     publicOption: '公共插件',

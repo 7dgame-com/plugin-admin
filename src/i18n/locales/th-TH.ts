@@ -1,7 +1,7 @@
 export default {
   pluginMeta: {
     name: 'ผู้ดูแลระบบ',
-    description: 'เครื่องมือจัดการสิทธิ์ ปลั๊กอิน และองค์กร',
+    description: 'เครื่องมือสิทธิ์ปลั๊กอิน การลงทะเบียน และภาพรวมองค์กรแบบอ่านอย่างเดียว',
     groupName: 'ระบบ',
   },
   common: {
@@ -102,6 +102,7 @@ export default {
     organizationName: 'ชื่ออังกฤษขององค์กร',
     organizationTitlePlaceholder: 'ชื่อที่ใช้แสดงขององค์กร',
     organizationNamePlaceholder: 'เช่น acme-studio',
+    readonlyHint: 'หน้านี้เป็นแบบอ่านอย่างเดียว การสร้าง แก้ไข และการดูแลองค์กรของผู้ใช้ต้องทำใน user-management',
     binding: 'ขอบเขตองค์กร',
     bindingPlaceholder: 'เลือกองค์กร',
     publicOption: 'ปลั๊กอินสาธารณะ',

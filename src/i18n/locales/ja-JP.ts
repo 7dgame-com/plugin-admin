@@ -1,7 +1,7 @@
 export default {
   pluginMeta: {
     name: 'システム管理',
-    description: 'プラグイン権限、登録、組織管理ツール',
+    description: 'プラグイン権限、登録、組織の閲覧専用一覧ツール',
     groupName: 'システム',
   },
   common: {
@@ -102,6 +102,7 @@ export default {
     organizationName: '組織英字名',
     organizationTitlePlaceholder: '組織の表示名',
     organizationNamePlaceholder: '例: acme-studio',
+    readonlyHint: 'このページは閲覧専用です。組織の追加・編集とユーザー組織のメンテナンスは user-management で行ってください。',
     binding: '組織スコープ',
     bindingPlaceholder: '組織を選択',
     publicOption: '共通プラグイン',

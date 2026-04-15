@@ -1,7 +1,7 @@
 export default {
   pluginMeta: {
     name: 'System Admin',
-    description: 'Plugin permissions, registry, and organization management',
+    description: 'Plugin permissions, registry, and read-only organization overview',
     groupName: 'System',
   },
   common: {
@@ -102,6 +102,7 @@ export default {
     organizationName: 'Organization Name',
     organizationTitlePlaceholder: 'Organization display title',
     organizationNamePlaceholder: 'e.g. acme-studio',
+    readonlyHint: 'This page is read-only. Create, edit, and user organization maintenance belong in user-management.',
     binding: 'Organization Scope',
     bindingPlaceholder: 'Select an organization',
     publicOption: 'Public Plugin',
