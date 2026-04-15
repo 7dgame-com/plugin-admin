@@ -24,18 +24,25 @@ describe('public API routes', () => {
     pluginPool.query.mockReset();
   });
 
-  it('merges general and domain-specific plugin list records', async () => {
+  it('returns public plugins for anonymous requests and organization plugins for authenticated users', async () => {
     const app = createApp();
 
     pluginPool.query
       .mockResolvedValueOnce([
         [
-          { id: 'tools', name: 'Tools', name_i18n: '{"en-US":"Tools"}', icon: 'Tools', order: 1, domain: null },
-        ],
-      ])
-      .mockResolvedValueOnce([
-        [
-          { id: 'tools', name: 'Utilities', name_i18n: '{"en-US":"Utilities"}', icon: 'Tool', order: 3, domain: 'demo.test' },
+          {
+            id: 'user-management',
+            name: 'User Management',
+            name_i18n: '{"en-US":"User Management"}',
+            description: 'base',
+            url: 'https://base.example.com',
+            icon: 'User',
+            enabled: 1,
+            order: 1,
+            allowed_origin: 'https://base.example.com',
+            version: '1.0.0',
+            organization_name: null,
+          },
         ],
       ])
       .mockResolvedValueOnce([
@@ -47,61 +54,121 @@ describe('public API routes', () => {
             description: 'base',
             url: 'https://base.example.com',
             icon: 'User',
-            group_id: 'tools',
             enabled: 1,
             order: 1,
             allowed_origin: 'https://base.example.com',
             version: '1.0.0',
-            domain: null,
+            organization_name: null,
           },
-        ],
-      ])
-      .mockResolvedValueOnce([
-        [
           {
-            id: 'user-management',
-            name: 'Tenant User Management',
-            name_i18n: '{"en-US":"Tenant User Management"}',
-            description: 'override',
-            url: 'https://tenant.example.com',
-            icon: 'UserFilled',
-            group_id: 'tools',
+            id: 'acme-tools',
+            name: 'Acme Tools',
+            name_i18n: '{"en-US":"Acme Tools"}',
+            description: 'org',
+            url: 'https://acme.example.com',
+            icon: 'Tools',
             enabled: 1,
             order: 2,
-            allowed_origin: 'https://tenant.example.com',
-            version: '2.0.0',
-            domain: 'demo.test',
+            allowed_origin: 'https://acme.example.com',
+            version: '1.0.0',
+            organization_name: 'acme',
           },
         ],
       ]);
 
-    const response = await request(app).get('/api/v1/plugin/list').query({ domain: 'demo.test' });
+    const anonymous = await request(app).get('/api/v1/plugin/list');
 
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual({
+    expect(anonymous.status).toBe(200);
+    expect(anonymous.body).toEqual({
       version: '1.0.0',
       menuGroups: [
         {
-          id: 'tools',
-          name: 'Utilities',
-          nameI18n: { 'en-US': 'Utilities' },
-          icon: 'Tool',
-          order: 3,
+          id: 'org:public',
+          name: '公共插件',
+          nameI18n: null,
+          icon: 'Grid',
+          order: 0,
         },
       ],
       plugins: [
         {
           id: 'user-management',
-          name: 'Tenant User Management',
-          nameI18n: { 'en-US': 'Tenant User Management' },
-          description: 'override',
-          url: 'https://tenant.example.com',
-          icon: 'UserFilled',
-          group: 'tools',
+          name: 'User Management',
+          nameI18n: { 'en-US': 'User Management' },
+          description: 'base',
+          url: 'https://base.example.com',
+          icon: 'User',
+          group: 'org:public',
+          enabled: true,
+          order: 1,
+          allowedOrigin: 'https://base.example.com',
+          version: '1.0.0',
+        },
+      ],
+    });
+
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        code: 0,
+        message: 'ok',
+        data: {
+          id: 3,
+          username: 'alice',
+          roles: ['admin'],
+          organizations: [{ id: 2, name: 'acme', title: 'Acme Studio' }],
+        },
+      },
+    } as never);
+
+    const authed = await request(app)
+      .get('/api/v1/plugin/list')
+      .set('Authorization', 'Bearer token');
+
+    expect(authed.status).toBe(200);
+    expect(authed.body).toEqual({
+      version: '1.0.0',
+      menuGroups: [
+        {
+          id: 'org:public',
+          name: '公共插件',
+          nameI18n: null,
+          icon: 'Grid',
+          order: 0,
+        },
+        {
+          id: 'org:acme',
+          name: 'Acme Studio',
+          nameI18n: null,
+          icon: 'OfficeBuilding',
+          order: 1,
+        },
+      ],
+      plugins: [
+        {
+          id: 'user-management',
+          name: 'User Management',
+          nameI18n: { 'en-US': 'User Management' },
+          description: 'base',
+          url: 'https://base.example.com',
+          icon: 'User',
+          group: 'org:public',
+          enabled: true,
+          order: 1,
+          allowedOrigin: 'https://base.example.com',
+          version: '1.0.0',
+        },
+        {
+          id: 'acme-tools',
+          name: 'Acme Tools',
+          nameI18n: { 'en-US': 'Acme Tools' },
+          description: 'org',
+          url: 'https://acme.example.com',
+          icon: 'Tools',
+          group: 'org:acme',
           enabled: true,
           order: 2,
-          allowedOrigin: 'https://tenant.example.com',
-          version: '2.0.0',
+          allowedOrigin: 'https://acme.example.com',
+          version: '1.0.0',
         },
       ],
     });
@@ -135,6 +202,79 @@ describe('public API routes', () => {
         actions: ['*'],
         user_id: 1,
         roles: ['root'],
+      },
+    });
+  });
+
+  it('returns plugin actions for authenticated non-root users', async () => {
+    const app = createApp();
+
+    mockedAxios.get.mockResolvedValue({
+      data: {
+        code: 0,
+        message: 'ok',
+        data: {
+          id: 7,
+          username: 'alice',
+          roles: ['admin'],
+        },
+      },
+    } as never);
+
+    pluginPool.query.mockResolvedValue([
+      [{ action: 'list-users, manage-organizations' }],
+    ]);
+
+    const response = await request(app)
+      .get('/api/v1/plugin/allowed-actions')
+      .query({ plugin_name: 'user-management' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      code: 0,
+      message: 'ok',
+      data: {
+        actions: ['list-users', 'manage-organizations'],
+        user_id: 7,
+        roles: ['admin'],
+      },
+    });
+  });
+
+  it('proxies verify-token for authenticated non-root users', async () => {
+    const app = createApp();
+
+    mockedAxios.get.mockResolvedValue({
+      data: {
+        code: 0,
+        message: 'ok',
+        data: {
+          id: 7,
+          username: 'alice',
+          nickname: 'Alice',
+          roles: ['admin'],
+          organizations: [{ id: 2, name: 'acme', title: 'Acme Studio' }],
+        },
+      },
+      status: 200,
+      headers: {},
+    } as never);
+
+    const response = await request(app)
+      .get('/api/v1/plugin/verify-token')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      code: 0,
+      message: 'ok',
+      data: {
+        id: 7,
+        username: 'alice',
+        nickname: 'Alice',
+        roles: ['admin'],
+        organizations: [{ id: 2, name: 'acme', title: 'Acme Studio' }],
       },
     });
   });

@@ -29,6 +29,11 @@ describe('Property 1: API baseURL 包含 /backend/api 前缀', () => {
     expect(pluginApi.defaults.baseURL).toBeDefined()
     expect(pluginApi.defaults.baseURL!.startsWith('/backend/api/')).toBe(true)
   })
+
+  it('mainApi.defaults.baseURL targets the main backend v1 prefix', async () => {
+    const { mainApi } = await import('../api/index')
+    expect(mainApi.defaults.baseURL).toBe('/api/v1')
+  })
 })
 
 // Feature: system-admin-plugin-upgrade, Property 5: x-refresh-token 响应头自动持久化
@@ -255,5 +260,17 @@ describe('Property 7: 双段刷新失败触发 TOKEN_EXPIRED', () => {
     } finally {
       adminApi.defaults.adapter = originalAdapter
     }
+  })
+})
+
+describe('organization api export boundary', () => {
+  it('exposes only the read-only organization list helper', async () => {
+    const apiModule = await import('../api/index') as Record<string, unknown>
+
+    expect(apiModule.getOrganizations).toBeTypeOf('function')
+    expect('createOrganization' in apiModule).toBe(false)
+    expect('updateOrganization' in apiModule).toBe(false)
+    expect('bindOrganizationUser' in apiModule).toBe(false)
+    expect('unbindOrganizationUser' in apiModule).toBe(false)
   })
 })

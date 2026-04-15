@@ -26,6 +26,10 @@
           <code>{{ envInfo.pluginApiBase }}</code>
         </div>
         <div class="info-item">
+          <span class="label">mainApi baseURL</span>
+          <code>{{ envInfo.mainApiBase }}</code>
+        </div>
+        <div class="info-item">
           <span class="label">Token 状态</span>
           <code :class="envInfo.hasToken ? 'ok' : 'warn'">{{ envInfo.hasToken ? '已设置' : '未设置' }}</code>
         </div>
@@ -271,7 +275,7 @@
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
-import adminApi, { pluginApi } from '../api'
+import adminApi, { mainApi, pluginApi } from '../api'
 import {
   fetchBackendDiagnostics,
   type BackendDiagnosticsCheck,
@@ -287,6 +291,7 @@ const envInfo = reactive({
   origin: window.location.origin,
   adminApiBase: adminApi.defaults.baseURL || '/backend/api/v1/plugin-admin',
   pluginApiBase: pluginApi.defaults.baseURL || '/backend/api/v1/plugin',
+  mainApiBase: mainApi.defaults.baseURL || '/api/v1',
   hasToken: !!getToken(),
   isIframe: isInIframe(),
   apiUpstream: '加载中...',
@@ -363,7 +368,7 @@ async function loadBackendDiagnostics() {
 interface TestItem {
   name: string
   method: string
-  instance: 'adminApi' | 'pluginApi'
+  instance: 'adminApi' | 'pluginApi' | 'mainApi'
   path: string
   params?: Record<string, any>
   fullUrl: string
@@ -374,10 +379,18 @@ interface TestItem {
   errorMessage: string
 }
 
-function makeTest(name: string, method: string, instance: 'adminApi' | 'pluginApi', path: string, params?: Record<string, any>): TestItem {
+function makeTest(
+  name: string,
+  method: string,
+  instance: 'adminApi' | 'pluginApi' | 'mainApi',
+  path: string,
+  params?: Record<string, any>
+): TestItem {
   const base = instance === 'adminApi'
     ? (adminApi.defaults.baseURL || '/backend/api/v1/plugin-admin')
-    : (pluginApi.defaults.baseURL || '/backend/api/v1/plugin')
+    : instance === 'pluginApi'
+      ? (pluginApi.defaults.baseURL || '/backend/api/v1/plugin')
+      : (mainApi.defaults.baseURL || '/api/v1')
   const qs = params ? '?' + new URLSearchParams(params as any).toString() : ''
   return {
     name, method, instance, path, params,
@@ -389,7 +402,7 @@ function makeTest(name: string, method: string, instance: 'adminApi' | 'pluginAp
 const tests = ref<TestItem[]>([
   makeTest('获取权限配置列表', 'GET', 'adminApi', '/permissions', { page: '1', per_page: '10' }),
   makeTest('获取插件列表', 'GET', 'adminApi', '/plugins', { page: '1', per_page: '10' }),
-  makeTest('获取菜单分组', 'GET', 'adminApi', '/menu-groups'),
+  makeTest('获取组织列表', 'GET', 'mainApi', '/organization/list'),
   makeTest('验证 Token', 'GET', 'pluginApi', '/verify-token', { plugin_name: 'system-admin' }),
   makeTest('获取权限列表', 'GET', 'pluginApi', '/allowed-actions', { plugin_name: 'system-admin' }),
 ])
@@ -401,7 +414,11 @@ async function runSingle(item: TestItem) {
   item.errorMessage = ''
   item.httpStatus = ''
 
-  const inst = item.instance === 'adminApi' ? adminApi : pluginApi
+  const inst = item.instance === 'adminApi'
+    ? adminApi
+    : item.instance === 'pluginApi'
+      ? pluginApi
+      : mainApi
   try {
     const resp = await inst.request({
       method: item.method,
