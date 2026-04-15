@@ -91,6 +91,9 @@ export default {
     allowedOriginPlaceholder: 'https://...',
     allowedHostOriginsPlaceholder: 'กรอก URL ของโฮสต์แล้วกด Enter เพื่อเพิ่มหลายรายการ',
     allowedHostOriginsHint: 'เว้นว่างไว้เพื่ออนุญาตทุกโฮสต์ ระบบจะปรับค่าเป็น origin ให้อัตโนมัติ',
+    toggleConfirmTitle: 'ยืนยันการเปลี่ยนสถานะการเปิดใช้งาน',
+    enableConfirm: 'เปิดใช้งานปลั๊กอิน "{name}" หรือไม่?',
+    disableConfirm: 'ปิดใช้งานปลั๊กอิน "{name}" หรือไม่?',
     deleteConfirm: 'ลบปลั๊กอิน "{name}" หรือไม่?',
     messages: {
       loadFailed: 'โหลดรายการปลั๊กอินไม่สำเร็จ',

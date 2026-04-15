@@ -91,6 +91,9 @@ export default {
     allowedOriginPlaceholder: 'https://...',
     allowedHostOriginsPlaceholder: 'Enter a host URL and press Enter to add multiple items',
     allowedHostOriginsHint: 'Leave empty to allow all hosts. Entries are normalized to origins automatically.',
+    toggleConfirmTitle: 'Confirm enabled state change',
+    enableConfirm: 'Enable plugin "{name}"?',
+    disableConfirm: 'Disable plugin "{name}"?',
     deleteConfirm: 'Delete plugin "{name}"?',
     messages: {
       loadFailed: 'Failed to load plugin list',

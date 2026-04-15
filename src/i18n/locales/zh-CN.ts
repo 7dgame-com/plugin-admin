@@ -91,6 +91,9 @@ export default {
     allowedOriginPlaceholder: 'https://...',
     allowedHostOriginsPlaceholder: '输入主站 URL 后回车，可添加多个',
     allowedHostOriginsHint: '留空表示不限制主站；填写时会自动按 origin 归一化。',
+    toggleConfirmTitle: '确认修改启用状态',
+    enableConfirm: '确定启用插件 "{name}"？',
+    disableConfirm: '确定停用插件 "{name}"？',
     deleteConfirm: '确定删除插件 "{name}"？',
     messages: {
       loadFailed: '加载插件列表失败',

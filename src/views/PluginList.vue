@@ -16,7 +16,12 @@
         </el-table-column>
         <el-table-column :label="t('common.enabled')" width="80">
           <template #default="{ row }">
-            <el-switch :model-value="!!row.enabled" disabled />
+            <el-switch
+              :model-value="!!row.enabled"
+              :loading="isPluginTogglePending(row.id)"
+              :disabled="isPluginTogglePending(row.id)"
+              :before-change="() => handleEnabledBeforeChange(row)"
+            />
           </template>
         </el-table-column>
         <el-table-column prop="version" :label="t('common.version')" width="100" />
@@ -149,6 +154,7 @@ const loading = ref(false)
 const submitting = ref(false)
 const tableData = ref<PluginItem[]>([])
 const organizations = ref<OrganizationItem[]>([])
+const togglingPluginIds = reactive<Record<string, boolean>>({})
 const dialogVisible = ref(false)
 const editingId = ref<string | null>(null)
 const formRef = ref<FormInstance>()
@@ -206,6 +212,48 @@ function normalizeOriginList(values: string[]) {
 }
 
 const derivedPluginOrigin = computed(() => getOriginFromUrl(form.url))
+
+function isPluginTogglePending(pluginId: string) {
+  return togglingPluginIds[pluginId] === true
+}
+
+async function handleEnabledBeforeChange(row: PluginItem) {
+  const nextEnabled = row.enabled ? 0 : 1
+  const confirmMessage = nextEnabled
+    ? t('plugin.enableConfirm', { name: row.name })
+    : t('plugin.disableConfirm', { name: row.name })
+
+  try {
+    await ElMessageBox.confirm(confirmMessage, t('plugin.toggleConfirmTitle'), {
+      type: 'warning',
+    })
+  } catch {
+    return false
+  }
+
+  togglingPluginIds[row.id] = true
+
+  try {
+    const { data } = await updatePlugin({
+      id: row.id,
+      enabled: nextEnabled,
+    })
+
+    if (data.code === 0) {
+      row.enabled = nextEnabled
+      ElMessage.success(t('common.messages.updateSuccess'))
+      notifyHostPluginRegistryChanged()
+    } else {
+      ElMessage.error(data.message || t('common.messages.operationFailed'))
+    }
+  } catch {
+    ElMessage.error(t('common.messages.operationFailed'))
+  } finally {
+    delete togglingPluginIds[row.id]
+  }
+
+  return false
+}
 
 async function loadData() {
   loading.value = true

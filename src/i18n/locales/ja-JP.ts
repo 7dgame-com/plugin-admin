@@ -91,6 +91,9 @@ export default {
     allowedOriginPlaceholder: 'https://...',
     allowedHostOriginsPlaceholder: 'ホスト URL を入力して Enter。複数追加できます',
     allowedHostOriginsHint: '空欄なら全ホストを許可します。入力値は origin に正規化されます。',
+    toggleConfirmTitle: '有効状態の変更を確認',
+    enableConfirm: 'プラグイン "{name}" を有効にしますか？',
+    disableConfirm: 'プラグイン "{name}" を無効にしますか？',
     deleteConfirm: 'プラグイン "{name}" を削除しますか？',
     messages: {
       loadFailed: 'プラグイン一覧の読み込みに失敗しました',

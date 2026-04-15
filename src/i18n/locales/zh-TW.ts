@@ -91,6 +91,9 @@ export default {
     allowedOriginPlaceholder: 'https://...',
     allowedHostOriginsPlaceholder: '輸入主站 URL 後按 Enter，可新增多個',
     allowedHostOriginsHint: '留空表示不限制主站；填寫時會自動按 origin 正規化。',
+    toggleConfirmTitle: '確認修改啟用狀態',
+    enableConfirm: '確定啟用外掛 "{name}"？',
+    disableConfirm: '確定停用外掛 "{name}"？',
     deleteConfirm: '確定刪除外掛 "{name}"？',
     messages: {
       loadFailed: '載入外掛列表失敗',
