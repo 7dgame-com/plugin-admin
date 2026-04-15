@@ -32,6 +32,10 @@ const passthroughStub = defineComponent({
   template: '<div><slot /></div>',
 })
 
+const ElButtonStub = defineComponent({
+  template: '<button class="el-button-stub"><slot /></button>',
+})
+
 describe('OrganizationList', () => {
   beforeEach(() => {
     getOrganizations.mockReset()
@@ -50,7 +54,7 @@ describe('OrganizationList', () => {
     })
   })
 
-  it('loads organizations on mount and renders the returned organization payload', async () => {
+  it('loads organizations in readonly mode without rendering write controls', async () => {
     const wrapper = shallowMount(OrganizationList, {
       global: {
         plugins: [i18n],
@@ -61,7 +65,7 @@ describe('OrganizationList', () => {
           ElTable: ElTableStub,
           ElCard: passthroughStub,
           ElTableColumn: passthroughStub,
-          ElButton: passthroughStub,
+          ElButton: ElButtonStub,
           ElDialog: passthroughStub,
           ElForm: passthroughStub,
           ElFormItem: passthroughStub,
@@ -77,5 +81,11 @@ describe('OrganizationList', () => {
     expect(getOrganizations).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('Acme Studio')
     expect(wrapper.text()).toContain('acme')
+    expect(wrapper.text()).toContain('此页面仅用于查看全部组织；新增、编辑和用户组织维护请前往 user-management。')
+    expect(wrapper.text()).not.toContain('新增组织')
+    expect(wrapper.text()).not.toContain('用户组织绑定')
+    expect(wrapper.text()).not.toContain('绑定组织')
+    expect(wrapper.text()).not.toContain('解绑组织')
+    expect(wrapper.findAll('.el-button-stub')).toHaveLength(0)
   })
 })
