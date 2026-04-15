@@ -262,3 +262,15 @@ describe('Property 7: 双段刷新失败触发 TOKEN_EXPIRED', () => {
     }
   })
 })
+
+describe('organization api export boundary', () => {
+  it('exposes only the read-only organization list helper', async () => {
+    const apiModule = await import('../api/index') as Record<string, unknown>
+
+    expect(apiModule.getOrganizations).toBeTypeOf('function')
+    expect('createOrganization' in apiModule).toBe(false)
+    expect('updateOrganization' in apiModule).toBe(false)
+    expect('bindOrganizationUser' in apiModule).toBe(false)
+    expect('unbindOrganizationUser' in apiModule).toBe(false)
+  })
+})

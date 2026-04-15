@@ -194,13 +194,5 @@ export interface OrganizationItem {
   name: string
 }
 
-// 组织管理 API（主后端）
+// 组织只读列表 API（主后端）
 export const getOrganizations = () => mainApi.get('/organization/list')
-export const createOrganization = (data: Pick<OrganizationItem, 'title' | 'name'>) =>
-  mainApi.post('/organization/create', data)
-export const updateOrganization = (data: Pick<OrganizationItem, 'id' | 'title'>) =>
-  mainApi.post('/organization/update', data)
-export const bindOrganizationUser = (data: { user_id: number; organization_id: number }) =>
-  mainApi.post('/organization/bind-user', data)
-export const unbindOrganizationUser = (data: { user_id: number; organization_id: number }) =>
-  mainApi.post('/organization/unbind-user', data)
