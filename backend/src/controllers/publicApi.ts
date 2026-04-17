@@ -70,6 +70,7 @@ export async function allowedActions(req: Request, res: Response): Promise<void>
 export async function list(req: Request, res: Response): Promise<void> {
   const authorization = req.headers?.authorization;
   let organizations: UserOrganizationSummary[] = [];
+  let roles: string[] = [];
 
   if (authorization !== undefined) {
     if (!authorization.startsWith('Bearer ')) {
@@ -90,6 +91,7 @@ export async function list(req: Request, res: Response): Promise<void> {
         return;
       }
       organizations = user.organizations ?? [];
+      roles = user.roles ?? [];
     } catch (err) {
       if (axios.isAxiosError(err) && (err.response?.status === 401 || err.response?.status === 403)) {
         res.status(401).json(error(1001, 'Token 无效或已过期'));
@@ -111,9 +113,19 @@ export async function list(req: Request, res: Response): Promise<void> {
           .filter((name) => name.length > 0)
       )
     );
+    const isRootUser = roles.includes('root');
     let plugins: PluginRow[];
 
-    if (hasOrganizationNameColumn && organizationNames.length > 0) {
+    if (hasOrganizationNameColumn && isRootUser) {
+      [plugins] = await pluginPool.query<PluginRow[]>(
+        `
+          SELECT *
+          FROM plugins
+          WHERE enabled = 1
+          ORDER BY \`order\` ASC
+        `
+      );
+    } else if (hasOrganizationNameColumn && organizationNames.length > 0) {
       [plugins] = await pluginPool.query<PluginRow[]>(
         `
           SELECT *
@@ -145,6 +157,21 @@ export async function list(req: Request, res: Response): Promise<void> {
       );
     }
 
+    const organizationTitleMap = new Map(
+      organizations.map((organization) => [
+        organization.name,
+        organization.title || organization.name,
+      ])
+    );
+    const pluginOrganizationNames = hasOrganizationNameColumn
+      ? Array.from(
+          new Set(
+            plugins
+              .map((plugin) => plugin.organization_name?.trim() ?? '')
+              .filter((name) => name.length > 0)
+          )
+        )
+      : [];
     const menuGroups = [
       {
         id: 'org:public',
@@ -153,38 +180,39 @@ export async function list(req: Request, res: Response): Promise<void> {
         icon: 'Grid',
         order: 0,
       },
-      ...(
-        hasOrganizationNameColumn
-          ? organizations.map((organization, index) => ({
-              id: `org:${organization.name}`,
-              name: organization.title || organization.name,
-              nameI18n: null,
-              icon: 'OfficeBuilding',
-              order: index + 1,
-          }))
-          : []
-      ),
+      ...pluginOrganizationNames.map((name, index) => ({
+        id: `org:${name}`,
+        name: organizationTitleMap.get(name) ?? name,
+        nameI18n: null,
+        icon: 'OfficeBuilding',
+        order: index + 1,
+      })),
     ];
+    const serializedPlugins = plugins.map((plugin) => {
+      const organizationName = plugin.organization_name?.trim() ?? '';
 
-    res.json({
-      version: '1.0.0',
-      menuGroups,
-      plugins: plugins.map((plugin) => ({
+      return {
         id: plugin.id,
         name: plugin.name,
         nameI18n: decodeJsonField(plugin.name_i18n),
         description: plugin.description,
         url: plugin.url,
         icon: plugin.icon,
-        group: hasOrganizationNameColumn && plugin.organization_name
-          ? `org:${plugin.organization_name}`
+        group: hasOrganizationNameColumn && organizationName
+          ? `org:${organizationName}`
           : 'org:public',
         enabled: Boolean(plugin.enabled),
         order: Number(plugin.order),
         allowedOrigin: deriveOriginFromUrl(plugin.url) ?? plugin.allowed_origin,
         allowedHostOrigins: normalizeOriginList(plugin.allowed_host_origins).origins,
         version: plugin.version,
-      })),
+      };
+    });
+
+    res.json({
+      version: '1.0.0',
+      menuGroups,
+      plugins: serializedPlugins,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : '未知错误';

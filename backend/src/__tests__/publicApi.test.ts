@@ -202,6 +202,115 @@ describe('public API routes', () => {
     });
   });
 
+  it('returns all enabled plugins and organization groups for authenticated root users', async () => {
+    const app = createApp();
+
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        code: 0,
+        message: 'ok',
+        data: {
+          id: 1,
+          username: 'root',
+          roles: ['root'],
+          organizations: [{ id: 2, name: 'acme', title: 'Acme Studio' }],
+        },
+      },
+    } as never);
+
+    pluginPool.query.mockResolvedValueOnce([
+      [
+        {
+          id: 'user-management',
+          name: 'User Management',
+          name_i18n: '{"en-US":"User Management"}',
+          description: 'base',
+          url: 'https://base.example.com/app',
+          icon: 'User',
+          enabled: 1,
+          order: 1,
+          allowed_origin: 'https://wrong.example.com',
+          allowed_host_origins: null,
+          version: '1.0.0',
+          organization_name: null,
+        },
+        {
+          id: 'north-tools',
+          name: 'North Tools',
+          name_i18n: '{"en-US":"North Tools"}',
+          description: 'north',
+          url: 'https://north.example.com/tools/index.html',
+          icon: 'Tools',
+          enabled: 1,
+          order: 2,
+          allowed_origin: 'https://stale.example.com',
+          allowed_host_origins: null,
+          version: '1.0.0',
+          organization_name: 'north',
+        },
+      ],
+    ]);
+
+    const response = await request(app)
+      .get('/api/v1/plugin/list')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    const [sql] = pluginPool.query.mock.calls[0] as [string];
+    const normalizedSql = sql.replace(/\s+/g, ' ').trim();
+    expect(normalizedSql).toContain('WHERE enabled = 1');
+    expect(normalizedSql).not.toContain('organization_name IN');
+    expect(response.body).toEqual({
+      version: '1.0.0',
+      menuGroups: [
+        {
+          id: 'org:public',
+          name: '公共插件',
+          nameI18n: null,
+          icon: 'Grid',
+          order: 0,
+        },
+        {
+          id: 'org:north',
+          name: 'north',
+          nameI18n: null,
+          icon: 'OfficeBuilding',
+          order: 1,
+        },
+      ],
+      plugins: [
+        {
+          id: 'user-management',
+          name: 'User Management',
+          nameI18n: { 'en-US': 'User Management' },
+          description: 'base',
+          url: 'https://base.example.com/app',
+          icon: 'User',
+          group: 'org:public',
+          enabled: true,
+          order: 1,
+          allowedOrigin: 'https://base.example.com',
+          allowedHostOrigins: [],
+          version: '1.0.0',
+        },
+        {
+          id: 'north-tools',
+          name: 'North Tools',
+          nameI18n: { 'en-US': 'North Tools' },
+          description: 'north',
+          url: 'https://north.example.com/tools/index.html',
+          icon: 'Tools',
+          group: 'org:north',
+          enabled: true,
+          order: 2,
+          allowedOrigin: 'https://north.example.com',
+          allowedHostOrigins: [],
+          version: '1.0.0',
+        },
+      ],
+    });
+  });
+
   it('falls back to the legacy public-only plugin query when organization_name is unavailable', async () => {
     process.env.PLUGIN_DB_HAS_ORGANIZATION_NAME_COLUMN = 'false';
     resetPluginSchemaCacheForTests();
