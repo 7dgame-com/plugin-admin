@@ -7,6 +7,7 @@ import diagnosticsRouter from './routes/diagnostics';
 import permissionsRouter from './routes/permissions';
 import pluginsRouter from './routes/plugins';
 import publicApiRouter from './routes/publicApi';
+import { getBuildInfo } from './utils/buildInfo';
 import { error, success } from './utils/response';
 import swaggerUi from 'swagger-ui-express';
 
@@ -35,7 +36,10 @@ export function createApp() {
   app.get('/health', async (_req, res) => {
     try {
       await pingPluginDb();
-      res.json(success({ status: 'ok' }));
+      const buildInfo = getBuildInfo();
+      res.set('X-Service-Version', buildInfo.version);
+      res.set('X-Git-Sha', buildInfo.gitSha);
+      res.json(success({ status: 'ok', ...buildInfo }));
     } catch (err) {
       const message = err instanceof Error ? err.message : '未知错误';
       res.status(500).json(error(5001, `数据库连接失败: ${message}`));

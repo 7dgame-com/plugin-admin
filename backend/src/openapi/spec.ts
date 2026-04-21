@@ -283,9 +283,14 @@ export const openApiDocument = {
           message: { type: 'string', example: 'ok' },
           data: {
             type: 'object',
-            required: ['status'],
+            required: ['status', 'service', 'version', 'gitSha', 'gitShaShort', 'buildTime'],
             properties: {
               status: { type: 'string', example: 'ok' },
+              service: { type: 'string', example: 'system-admin-backend' },
+              version: { type: 'string', example: '1.0.0' },
+              gitSha: { type: 'string', example: 'abc123def456' },
+              gitShaShort: { type: 'string', example: 'abc123d' },
+              buildTime: { type: 'string', example: '2026-04-21T12:58:00Z' },
             },
           },
         },

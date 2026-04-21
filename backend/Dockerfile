@@ -14,6 +14,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+ARG APP_VERSION=unknown
+ARG GIT_SHA=unknown
+ARG BUILD_TIME=unknown
+
+ENV APP_VERSION=$APP_VERSION
+ENV GIT_SHA=$GIT_SHA
+ENV BUILD_TIME=$BUILD_TIME
+
 COPY package.json package-lock.json* ./
 
 RUN npm install --production
