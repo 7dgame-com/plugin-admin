@@ -92,7 +92,7 @@ export async function list(req: Request, res: Response): Promise<void> {
     }
 
     try {
-      const user = await verifyBearerToken(token);
+      const user = await verifyBearerToken(token, req);
       if (!user) {
         res.status(401).json(error(1001, 'Token 无效或已过期'));
         return;

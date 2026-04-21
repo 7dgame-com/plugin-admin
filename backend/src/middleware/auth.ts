@@ -54,12 +54,70 @@ function parseOrganizations(rawOrganizations: unknown): UserOrganizationSummary[
   });
 }
 
-export async function verifyBearerToken(token: string): Promise<UserInfo | null> {
+function normalizeHeaderValue(value: string | string[] | undefined): string | undefined {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  const normalized = rawValue?.split(',')[0]?.trim();
+  return normalized === '' ? undefined : normalized;
+}
+
+function parseUrlHeader(value: string | undefined): URL | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    return new URL(value);
+  } catch {
+    return undefined;
+  }
+}
+
+function buildTokenVerificationHeaders(token: string, req?: Request): Record<string, string> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+  };
+
+  if (!req) {
+    return headers;
+  }
+
+  const originUrl = parseUrlHeader(normalizeHeaderValue(req.headers.origin));
+  const refererUrl = parseUrlHeader(normalizeHeaderValue(req.headers.referer));
+  const browserUrl = originUrl ?? refererUrl;
+  const forwardedHost = normalizeHeaderValue(req.headers['x-forwarded-host'])
+    ?? normalizeHeaderValue(req.headers['x-original-host'])
+    ?? browserUrl?.host
+    ?? normalizeHeaderValue(req.headers.host);
+  const forwardedProto = normalizeHeaderValue(req.headers['x-forwarded-proto'])
+    ?? browserUrl?.protocol.replace(/:$/, '')
+    ?? (req.protocol || undefined);
+  const forwardedFor = normalizeHeaderValue(req.headers['x-forwarded-for']);
+  const realIp = normalizeHeaderValue(req.headers['x-real-ip']);
+
+  if (forwardedHost) {
+    headers.Host = forwardedHost;
+    headers['X-Forwarded-Host'] = forwardedHost;
+  }
+
+  if (forwardedProto) {
+    headers['X-Forwarded-Proto'] = forwardedProto;
+  }
+
+  if (forwardedFor) {
+    headers['X-Forwarded-For'] = forwardedFor;
+  }
+
+  if (realIp) {
+    headers['X-Real-IP'] = realIp;
+  }
+
+  return headers;
+}
+
+export async function verifyBearerToken(token: string, req?: Request): Promise<UserInfo | null> {
   const { response } = await requestMainApiGet('/v1/plugin/verify-token', {
     key: token,
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: buildTokenVerificationHeaders(token, req),
   });
 
   const data = response.data as { data?: Record<string, unknown> } | Record<string, unknown> | undefined;
@@ -100,7 +158,7 @@ export async function auth(req: Request, res: Response, next: NextFunction): Pro
   }
 
   try {
-    const user = await verifyBearerToken(token);
+    const user = await verifyBearerToken(token, req);
     if (!user) {
       invalidTokenResponse(res);
       return;

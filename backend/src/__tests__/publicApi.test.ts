@@ -208,6 +208,47 @@ describe('public API routes', () => {
     });
   });
 
+  it('forwards the original host context when verifying plugin list bearer tokens', async () => {
+    const app = createApp();
+
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        code: 0,
+        message: 'ok',
+        data: {
+          id: 24,
+          username: 'guanfei',
+          roles: ['admin', 'user'],
+          organizations: [{ id: 1, name: 'test', title: '测试大学' }],
+        },
+      },
+    } as never);
+
+    pluginPool.query.mockResolvedValueOnce([[]]);
+
+    const response = await request(app)
+      .get('/api/v1/plugin/list')
+      .set('Authorization', 'Bearer token')
+      .set('Host', 'system-admin-backend:8088')
+      .set('Referer', 'https://d.dev.xrugc.com/home/index?lang=zh-CN')
+      .set('X-Forwarded-Proto', 'https')
+      .set('X-Forwarded-For', '203.0.113.9');
+
+    expect(response.status).toBe(200);
+    expect(mockedAxios.get).toHaveBeenCalledWith(
+      expect.stringContaining('/v1/plugin/verify-token'),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer token',
+          Host: 'd.dev.xrugc.com',
+          'X-Forwarded-Host': 'd.dev.xrugc.com',
+          'X-Forwarded-Proto': 'https',
+          'X-Forwarded-For': '203.0.113.9',
+        }),
+      })
+    );
+  });
+
   it('returns all enabled plugins and organization groups for authenticated root users', async () => {
     const app = createApp();
 
