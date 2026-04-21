@@ -72,10 +72,52 @@ function parseUrlHeader(value: string | undefined): URL | undefined {
   }
 }
 
+function decodeJwtPayload(token: string): Record<string, unknown> | undefined {
+  const payload = token.split('.')[1];
+  if (!payload) {
+    return undefined;
+  }
+
+  try {
+    const decoded = Buffer.from(payload, 'base64url').toString('utf8');
+    const parsed = JSON.parse(decoded) as unknown;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function parseTokenIssuerContext(token: string): { host: string; proto: string } | undefined {
+  const issuer = decodeJwtPayload(token)?.iss;
+  if (typeof issuer !== 'string') {
+    return undefined;
+  }
+
+  const issuerUrl = parseUrlHeader(issuer);
+  if (!issuerUrl || !['http:', 'https:'].includes(issuerUrl.protocol) || !issuerUrl.host) {
+    return undefined;
+  }
+
+  return {
+    host: issuerUrl.host,
+    proto: issuerUrl.protocol.replace(/:$/, ''),
+  };
+}
+
 function buildTokenVerificationHeaders(token: string, req?: Request): Record<string, string> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
   };
+  const issuerContext = parseTokenIssuerContext(token);
+
+  if (issuerContext) {
+    // Main API signs JWTs with request hostInfo, so verify against the token issuer host.
+    headers.Host = issuerContext.host;
+    headers['X-Forwarded-Host'] = issuerContext.host;
+    headers['X-Forwarded-Proto'] = issuerContext.proto;
+  }
 
   if (!req) {
     return headers;
@@ -88,14 +130,18 @@ function buildTokenVerificationHeaders(token: string, req?: Request): Record<str
     ?? normalizeHeaderValue(req.headers['x-original-host'])
     ?? browserUrl?.host
     ?? normalizeHeaderValue(req.headers.host);
-  const forwardedProto = normalizeHeaderValue(req.headers['x-forwarded-proto'])
+  const forwardedProto = issuerContext?.proto
+    ?? normalizeHeaderValue(req.headers['x-forwarded-proto'])
     ?? browserUrl?.protocol.replace(/:$/, '')
     ?? (req.protocol || undefined);
   const forwardedFor = normalizeHeaderValue(req.headers['x-forwarded-for']);
   const realIp = normalizeHeaderValue(req.headers['x-real-ip']);
 
-  if (forwardedHost) {
-    headers.Host = forwardedHost;
+  if (issuerContext) {
+    if (forwardedHost) {
+      headers['X-Original-Host'] = forwardedHost;
+    }
+  } else if (forwardedHost) {
     headers['X-Forwarded-Host'] = forwardedHost;
   }
 

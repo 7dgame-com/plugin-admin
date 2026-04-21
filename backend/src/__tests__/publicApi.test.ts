@@ -20,6 +20,14 @@ const { pluginPool } = jest.requireMock('../db/pluginDb') as {
 };
 const originalHasOrganizationNameColumn = process.env.PLUGIN_DB_HAS_ORGANIZATION_NAME_COLUMN;
 
+function makeJwt(payload: Record<string, unknown>): string {
+  const encode = (value: Record<string, unknown>) => Buffer
+    .from(JSON.stringify(value))
+    .toString('base64url');
+
+  return `${encode({ alg: 'RS256', typ: 'JWT' })}.${encode(payload)}.signature`;
+}
+
 describe('public API routes', () => {
   beforeEach(() => {
     mockedAxios.get.mockReset();
@@ -208,7 +216,7 @@ describe('public API routes', () => {
     });
   });
 
-  it('forwards the original host context when verifying plugin list bearer tokens', async () => {
+  it('verifies plugin list bearer tokens against their issuer host', async () => {
     const app = createApp();
 
     mockedAxios.get.mockResolvedValueOnce({
@@ -225,10 +233,11 @@ describe('public API routes', () => {
     } as never);
 
     pluginPool.query.mockResolvedValueOnce([[]]);
+    const token = makeJwt({ iss: 'http://api.d.tmrpp.com', uid: 7 });
 
     const response = await request(app)
       .get('/api/v1/plugin/list')
-      .set('Authorization', 'Bearer token')
+      .set('Authorization', `Bearer ${token}`)
       .set('Host', 'system-admin-backend:8088')
       .set('Referer', 'https://d.dev.xrugc.com/home/index?lang=zh-CN')
       .set('X-Forwarded-Proto', 'https')
@@ -239,10 +248,11 @@ describe('public API routes', () => {
       expect.stringContaining('/v1/plugin/verify-token'),
       expect.objectContaining({
         headers: expect.objectContaining({
-          Authorization: 'Bearer token',
-          Host: 'd.dev.xrugc.com',
-          'X-Forwarded-Host': 'd.dev.xrugc.com',
-          'X-Forwarded-Proto': 'https',
+          Authorization: `Bearer ${token}`,
+          Host: 'api.d.tmrpp.com',
+          'X-Forwarded-Host': 'api.d.tmrpp.com',
+          'X-Forwarded-Proto': 'http',
+          'X-Original-Host': 'd.dev.xrugc.com',
           'X-Forwarded-For': '203.0.113.9',
         }),
       })
