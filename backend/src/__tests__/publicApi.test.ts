@@ -57,6 +57,7 @@ describe('public API routes', () => {
             allowed_host_origins:
               '["https://main-a.example.com/admin","https://main-b.example.com"]',
             version: '1.0.0',
+            access_scope: 'admin-only',
             organization_name: null,
           },
         ],
@@ -76,6 +77,7 @@ describe('public API routes', () => {
             allowed_host_origins:
               '["https://main-a.example.com/admin","https://main-b.example.com"]',
             version: '1.0.0',
+            access_scope: 'admin-only',
             organization_name: null,
           },
           {
@@ -90,6 +92,7 @@ describe('public API routes', () => {
             allowed_origin: 'https://stale.example.com',
             allowed_host_origins: null,
             version: '1.0.0',
+            access_scope: 'manager-only',
             organization_name: 'acme',
           },
         ],
@@ -125,6 +128,7 @@ describe('public API routes', () => {
             'https://main-a.example.com',
             'https://main-b.example.com',
           ],
+          accessScope: 'admin-only',
           version: '1.0.0',
         },
       ],
@@ -182,6 +186,7 @@ describe('public API routes', () => {
             'https://main-a.example.com',
             'https://main-b.example.com',
           ],
+          accessScope: 'admin-only',
           version: '1.0.0',
         },
         {
@@ -196,6 +201,7 @@ describe('public API routes', () => {
           order: 2,
           allowedOrigin: 'https://acme.example.com',
           allowedHostOrigins: [],
+          accessScope: 'manager-only',
           version: '1.0.0',
         },
       ],
@@ -232,6 +238,7 @@ describe('public API routes', () => {
           allowed_origin: 'https://wrong.example.com',
           allowed_host_origins: null,
           version: '1.0.0',
+          access_scope: 'auth-only',
           organization_name: null,
         },
         {
@@ -246,6 +253,7 @@ describe('public API routes', () => {
           allowed_origin: 'https://stale.example.com',
           allowed_host_origins: null,
           version: '1.0.0',
+          access_scope: 'root-only',
           organization_name: 'north',
         },
       ],
@@ -291,6 +299,7 @@ describe('public API routes', () => {
           order: 1,
           allowedOrigin: 'https://base.example.com',
           allowedHostOrigins: [],
+          accessScope: 'auth-only',
           version: '1.0.0',
         },
         {
@@ -305,6 +314,7 @@ describe('public API routes', () => {
           order: 2,
           allowedOrigin: 'https://north.example.com',
           allowedHostOrigins: [],
+          accessScope: 'root-only',
           version: '1.0.0',
         },
       ],
@@ -345,6 +355,7 @@ describe('public API routes', () => {
           allowed_host_origins:
             '["https://main-a.example.com/admin","https://main-b.example.com"]',
           version: '1.0.0',
+          access_scope: 'manager-only',
           group_id: 'tools',
           domain: null,
         },
@@ -387,6 +398,7 @@ describe('public API routes', () => {
             'https://main-a.example.com',
             'https://main-b.example.com',
           ],
+          accessScope: 'manager-only',
           version: '1.0.0',
         },
       ],
@@ -425,6 +437,43 @@ describe('public API routes', () => {
     });
   });
 
+  it('returns no allowed actions for authenticated non-root users on system-admin', async () => {
+    const app = createApp();
+
+    mockedAxios.get.mockResolvedValue({
+      data: {
+        code: 0,
+        message: 'ok',
+        data: {
+          id: 7,
+          username: 'alice',
+          roles: ['admin'],
+        },
+      },
+    } as never);
+
+    pluginPool.query.mockResolvedValue([
+      [{ action: 'manage-permissions,manage-plugins' }],
+    ]);
+
+    const response = await request(app)
+      .get('/api/v1/plugin/allowed-actions')
+      .query({ plugin_name: 'system-admin' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      code: 0,
+      message: 'ok',
+      data: {
+        actions: [],
+        user_id: 7,
+        roles: ['admin'],
+      },
+    });
+    expect(pluginPool.query).not.toHaveBeenCalled();
+  });
+
   it('returns plugin actions for authenticated non-root users', async () => {
     const app = createApp();
 
@@ -461,40 +510,13 @@ describe('public API routes', () => {
     });
   });
 
-  it('proxies verify-token for authenticated non-root users', async () => {
+  it('does not expose the verify-token proxy route anymore', async () => {
     const app = createApp();
-
-    mockedAxios.get.mockResolvedValue({
-      data: {
-        code: 0,
-        message: 'ok',
-        data: {
-          id: 7,
-          username: 'alice',
-          nickname: 'Alice',
-          roles: ['admin'],
-          organizations: [{ id: 2, name: 'acme', title: 'Acme Studio' }],
-        },
-      },
-      status: 200,
-      headers: {},
-    } as never);
 
     const response = await request(app)
       .get('/api/v1/plugin/verify-token')
       .set('Authorization', 'Bearer token');
 
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual({
-      code: 0,
-      message: 'ok',
-      data: {
-        id: 7,
-        username: 'alice',
-        nickname: 'Alice',
-        roles: ['admin'],
-        organizations: [{ id: 2, name: 'acme', title: 'Acme Studio' }],
-      },
-    });
+    expect(response.status).toBe(404);
   });
 });

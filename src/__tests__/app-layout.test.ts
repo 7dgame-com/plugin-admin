@@ -3,10 +3,9 @@ import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AppLayout from '../layout/AppLayout.vue'
 
-const { replace, pluginGet, fetchPermissions, removeAllTokens } = vi.hoisted(() => ({
+const { replace, fetchSession, removeAllTokens } = vi.hoisted(() => ({
   replace: vi.fn(),
-  pluginGet: vi.fn(),
-  fetchPermissions: vi.fn(),
+  fetchSession: vi.fn(),
   removeAllTokens: vi.fn(),
 }))
 
@@ -14,17 +13,16 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ replace }),
 }))
 
-vi.mock('../api/index', () => ({
-  pluginApi: { get: pluginGet },
-  default: {},
-}))
+const authSessionState = {
+  user: ref<{ username: string; nickname?: string; roles: string[] } | null>(null),
+  isRootUser: ref(true),
+}
 
-vi.mock('../composables/usePermissions', () => ({
-  usePermissions: () => ({
-    loaded: ref(true),
-    fetchPermissions,
-    can: () => true,
-    hasAny: () => true,
+vi.mock('../composables/useAuthSession', () => ({
+  useAuthSession: () => ({
+    user: authSessionState.user,
+    isRootUser: authSessionState.isRootUser,
+    fetchSession,
   }),
 }))
 
@@ -44,19 +42,14 @@ vi.mock('vue-i18n', () => ({
 describe('AppLayout', () => {
   beforeEach(() => {
     replace.mockReset()
-    pluginGet.mockReset()
-    fetchPermissions.mockReset()
+    fetchSession.mockReset()
     removeAllTokens.mockReset()
+    authSessionState.user.value = { username: 'root', nickname: 'Root', roles: ['root'] }
+    authSessionState.isRootUser.value = true
   })
 
   it('clears tokens and routes standalone users to /login when logout is clicked', async () => {
-    pluginGet.mockResolvedValue({
-      data: {
-        code: 0,
-        data: { username: 'root', nickname: 'Root', roles: ['root'] },
-      },
-    })
-    fetchPermissions.mockResolvedValue(undefined)
+    fetchSession.mockResolvedValue(undefined)
 
     const wrapper = mount(AppLayout, {
       global: {
@@ -84,6 +77,7 @@ describe('AppLayout', () => {
     await wrapper.get('[data-testid="logout-button"]').trigger('click')
 
     expect(removeAllTokens).toHaveBeenCalled()
+    expect(fetchSession).toHaveBeenCalledTimes(1)
     expect(replace).toHaveBeenCalledWith({ name: 'Login' })
   })
 })

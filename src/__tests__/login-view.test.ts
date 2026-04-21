@@ -4,14 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const {
   replace,
   authPost,
-  pluginGet,
+  verifyToken,
   setToken,
   setRefreshToken,
   removeAllTokens,
 } = vi.hoisted(() => ({
   replace: vi.fn(),
   authPost: vi.fn(),
-  pluginGet: vi.fn(),
+  verifyToken: vi.fn(),
   setToken: vi.fn(),
   setRefreshToken: vi.fn(),
   removeAllTokens: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock('vue-i18n', () => ({
 
 vi.mock('../api/index', () => ({
   authApi: { post: authPost },
-  pluginApi: { get: pluginGet },
+  verifyToken,
 }))
 
 vi.mock('../utils/token', async (importOriginal) => {
@@ -47,7 +47,7 @@ describe('LoginView', () => {
   beforeEach(() => {
     replace.mockReset()
     authPost.mockReset()
-    pluginGet.mockReset()
+    verifyToken.mockReset()
     setToken.mockReset()
     setRefreshToken.mockReset()
     removeAllTokens.mockReset()
@@ -60,7 +60,7 @@ describe('LoginView', () => {
         token: { accessToken: 'access-1', refreshToken: 'refresh-1' },
       },
     })
-    pluginGet.mockResolvedValue({
+    verifyToken.mockResolvedValue({
       data: {
         code: 0,
         data: { userId: 1, username: 'root', roles: ['root'] },
@@ -85,7 +85,7 @@ describe('LoginView', () => {
         token: { accessToken: 'access-1', refreshToken: 'refresh-1' },
       },
     })
-    pluginGet.mockResolvedValue({
+    verifyToken.mockResolvedValue({
       data: {
         code: 0,
         data: { userId: 2, username: 'admin', roles: ['admin'] },

@@ -1,14 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { usePermissions } from '../composables/usePermissions'
-import i18n from '../i18n'
+import { useAuthSession } from '../composables/useAuthSession'
 import { getRuntimeMode, getToken } from '../utils/token'
 
 declare module 'vue-router' {
   interface RouteMeta {
     title?: string
     public?: boolean
-    requiresPermission?: string
+    requiresRoot?: boolean
+    requiresManager?: boolean
   }
 }
 
@@ -42,19 +41,19 @@ const router = createRouter({
           path: 'permissions',
           name: 'PermissionList',
           component: () => import('../views/PermissionList.vue'),
-          meta: { title: '插件权限管理', requiresPermission: 'manage-permissions' }
+          meta: { title: '插件权限管理', requiresRoot: true }
         },
         {
           path: 'plugins',
           name: 'PluginList',
           component: () => import('../views/PluginList.vue'),
-          meta: { title: '插件注册管理', requiresPermission: 'manage-plugins' }
+          meta: { title: '插件注册管理', requiresRoot: true }
         },
         {
           path: 'organizations',
           name: 'OrganizationList',
           component: () => import('../views/OrganizationList.vue'),
-          meta: { title: '组织管理', requiresPermission: 'manage-organizations' }
+          meta: { title: '组织管理', requiresRoot: true }
         },
       ]
     }
@@ -62,9 +61,9 @@ const router = createRouter({
 })
 
 export async function permissionGuard(
-  to: { meta: { public?: boolean; requiresPermission?: string }; fullPath: string },
-  from: { name?: string | symbol | null | undefined }
-): Promise<boolean | string | { name: string; query: { redirect: string } }> {
+  to: { meta: { public?: boolean; requiresRoot?: boolean; requiresManager?: boolean }; fullPath: string },
+  _from: { name?: string | symbol | null | undefined }
+): Promise<boolean | string | { name: string; query: { redirect?: string; reason?: string } }> {
   if (to.meta.public) return true
 
   if (getRuntimeMode() === 'standalone' && !getToken()) {
@@ -74,25 +73,29 @@ export async function permissionGuard(
     }
   }
 
-  const requiredPermission = to.meta.requiresPermission
-  if (!requiredPermission) return true
+  if (!to.meta.requiresRoot && !to.meta.requiresManager) return true
 
   try {
-    const { can, loaded, fetchPermissions } = usePermissions()
-    if (!loaded.value) {
-      await fetchPermissions()
-    }
-    if (can(requiredPermission as Parameters<typeof can>[0])) {
+    const { fetchSession, isRootUser, hasManagerAccess } = useAuthSession()
+    await fetchSession()
+    if (to.meta.requiresRoot && isRootUser.value) {
       return true
     }
-    // 首次导航（from.name 为空）时直接放行，避免重定向回 '/' 产生无限循环
-    if (!from.name) return true
-    ElMessage.error(i18n.global.t('layout.permissionDenied'))
-    return false
+    if (to.meta.requiresManager && hasManagerAccess.value) {
+      return true
+    }
+    return {
+      name: 'NotAllowed',
+      query: { reason: to.meta.requiresRoot ? 'root' : 'manager' }
+    }
   } catch {
-    ElMessage.error(i18n.global.t('layout.permissionCheckFailed'))
-    if (!from.name) return true
-    return false
+    if (getRuntimeMode() === 'standalone') {
+      return {
+        name: 'Login',
+        query: { redirect: to.fullPath }
+      }
+    }
+    return { name: 'NotAllowed', query: { reason: 'root' } }
   }
 }
 

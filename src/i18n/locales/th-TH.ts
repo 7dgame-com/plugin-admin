@@ -39,6 +39,7 @@ export default {
     title: 'เข้าสู่ระบบผู้ดูแลระบบ',
     login: 'เข้าสู่ระบบ',
     rootOnly: 'เฉพาะผู้ใช้ root เท่านั้นที่เข้า system-admin ได้',
+    managerOnly: 'เฉพาะผู้ใช้ manager หรือ root เท่านั้นที่เข้าหน้านี้ได้',
     loginFailed: 'เข้าสู่ระบบไม่สำเร็จ โปรดลองอีกครั้ง',
   },
   layout: {
@@ -50,6 +51,7 @@ export default {
     permissionCheckFailed: 'การตรวจสอบสิทธิ์ล้มเหลว กรุณาลองใหม่ภายหลัง',
     logout: 'ออกจากระบบ',
     rootOnlyDenied: 'เฉพาะผู้ใช้ root เท่านั้นที่เข้า system-admin ได้',
+    managerOnlyDenied: 'เฉพาะผู้ใช้ manager หรือ root เท่านั้นที่เข้าหน้านี้ได้',
     sessionExpired: 'เซสชันหมดอายุแล้ว กรุณาเข้าสู่ระบบใหม่',
   },
   permission: {
@@ -83,6 +85,8 @@ export default {
     pluginOrigin: 'Plugin Origin',
     pluginOriginPlaceholder: 'คำนวณจาก URL อัตโนมัติ',
     allowedHostOrigins: 'ต้นทางโฮสต์ที่อนุญาต',
+    accessScope: 'การมองเห็นในเมนู',
+    accessScopePlaceholder: 'เลือกผู้ที่มองเห็นปลั๊กอินนี้ในเมนูโฮสต์',
     pluginIdPlaceholder: 'เช่น my-plugin',
     namePlaceholder: 'ชื่อแสดงผลของปลั๊กอิน',
     organizationPlaceholder: 'เลือกองค์กร หรือเว้นว่างสำหรับปลั๊กอินสาธารณะ',
@@ -91,6 +95,12 @@ export default {
     allowedOriginPlaceholder: 'https://...',
     allowedHostOriginsPlaceholder: 'กรอก URL ของโฮสต์แล้วกด Enter เพื่อเพิ่มหลายรายการ',
     allowedHostOriginsHint: 'เว้นว่างไว้เพื่ออนุญาตทุกโฮสต์ ระบบจะปรับค่าเป็น origin ให้อัตโนมัติ',
+    accessScopes: {
+      authOnly: 'ผู้ใช้ที่เข้าสู่ระบบ',
+      adminOnly: 'admin หรือ root',
+      managerOnly: 'manager หรือ root',
+      rootOnly: 'เฉพาะ root',
+    },
     toggleConfirmTitle: 'ยืนยันการเปลี่ยนสถานะการเปิดใช้งาน',
     enableConfirm: 'เปิดใช้งานปลั๊กอิน "{name}" หรือไม่?',
     disableConfirm: 'ปิดใช้งานปลั๊กอิน "{name}" หรือไม่?',

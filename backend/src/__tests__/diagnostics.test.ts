@@ -24,7 +24,10 @@ describe('diagnostics route', () => {
     process.env = {
       ...originalEnv,
       PORT: '8088',
-      MAIN_API_URL: 'http://localhost:8081',
+      APP_API_1_URL: 'http://localhost:8081',
+      APP_API_1_WEIGHT: '60',
+      APP_API_2_URL: 'http://localhost:8082',
+      APP_API_2_WEIGHT: '40',
       MAIN_API_TIMEOUT_MS: '5000',
       PLUGIN_DB_HOST: 'localhost',
       PLUGIN_DB_PORT: '3306',
@@ -68,20 +71,26 @@ describe('diagnostics route', () => {
     });
     expect(response.body.data.checks.main_backend_health).toMatchObject({
       status: 'ok',
-      target: 'http://localhost:8081/health',
       http_status: 200,
     });
+    expect(response.body.data.checks.main_backend_health.target).toMatch(/^http:\/\/localhost:808[12]\/health$/);
     expect(response.body.data.checks.main_backend_verify_token).toMatchObject({
       status: 'reachable',
-      target: 'http://localhost:8081/v1/plugin/verify-token',
       http_status: 401,
     });
+    expect(response.body.data.checks.main_backend_verify_token.target).toMatch(
+      /^http:\/\/localhost:808[12]\/v1\/plugin\/verify-token$/
+    );
     expect(response.body.data.checks.plugin_db).toMatchObject({
       status: 'ok',
     });
-    expect(response.body.data.config.MAIN_API_URL).toMatchObject({
+    expect(response.body.data.config.APP_API_1_URL).toMatchObject({
       status: 'ok',
       value: 'http://localhost:8081',
+    });
+    expect(response.body.data.config.APP_API_2_URL).toMatchObject({
+      status: 'ok',
+      value: 'http://localhost:8082',
     });
     expect(response.body.data.config.PLUGIN_DB_PASSWORD).toMatchObject({
       status: 'ok',
@@ -117,7 +126,7 @@ describe('diagnostics route', () => {
   });
 
   it('marks invalid critical config as error without hiding the rest of the report', async () => {
-    process.env.MAIN_API_URL = 'not-a-url';
+    process.env.APP_API_1_URL = 'not-a-url';
 
     mockedAxios.get
       .mockRejectedValueOnce(new Error('invalid url'))
@@ -127,7 +136,7 @@ describe('diagnostics route', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data.status).toBe('error');
-    expect(response.body.data.config.MAIN_API_URL).toMatchObject({
+    expect(response.body.data.config.APP_API_1_URL).toMatchObject({
       status: 'error',
       value: 'not-a-url',
     });

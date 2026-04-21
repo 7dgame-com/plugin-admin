@@ -39,6 +39,7 @@ export default {
     title: 'System Admin Login',
     login: 'Log In',
     rootOnly: 'Only root users can access system-admin',
+    managerOnly: 'Only manager or root users can access this page',
     loginFailed: 'Login failed. Please try again.',
   },
   layout: {
@@ -50,6 +51,7 @@ export default {
     permissionCheckFailed: 'Permission check failed, please try again later',
     logout: 'Log Out',
     rootOnlyDenied: 'Only root users can access system-admin',
+    managerOnlyDenied: 'Only manager or root users can access this page',
     sessionExpired: 'Your session expired. Please sign in again.',
   },
   permission: {
@@ -83,6 +85,8 @@ export default {
     pluginOrigin: 'Plugin Origin',
     pluginOriginPlaceholder: 'Derived from URL automatically',
     allowedHostOrigins: 'Allowed Host Origins',
+    accessScope: 'Menu Visibility',
+    accessScopePlaceholder: 'Choose who can see this plugin in the host menu',
     pluginIdPlaceholder: 'e.g. my-plugin',
     namePlaceholder: 'Plugin display name',
     organizationPlaceholder: 'Select an organization, or leave empty for a public plugin',
@@ -91,6 +95,12 @@ export default {
     allowedOriginPlaceholder: 'https://...',
     allowedHostOriginsPlaceholder: 'Enter a host URL and press Enter to add multiple items',
     allowedHostOriginsHint: 'Leave empty to allow all hosts. Entries are normalized to origins automatically.',
+    accessScopes: {
+      authOnly: 'Authenticated users',
+      adminOnly: 'admin or root',
+      managerOnly: 'manager or root',
+      rootOnly: 'root only',
+    },
     toggleConfirmTitle: 'Confirm enabled state change',
     enableConfirm: 'Enable plugin "{name}"?',
     disableConfirm: 'Disable plugin "{name}"?',

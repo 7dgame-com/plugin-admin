@@ -231,6 +231,7 @@ describe('PluginList', () => {
               name: 'AI 3D 生成器 V3',
               url: 'http://localhost:3008/',
               organization_name: null,
+              access_scope: 'manager-only',
               enabled: 1,
               version: '1.0.0',
               icon: null,
@@ -298,5 +299,13 @@ describe('PluginList', () => {
     expect(updatePlugin).not.toHaveBeenCalled()
     expect(notifyHostPluginRegistryChanged).not.toHaveBeenCalled()
     expect(wrapper.get('.el-switch-stub').attributes('data-checked')).toBe('true')
+  })
+
+  it('renders the configured access_scope label from plugin rows', async () => {
+    const wrapper = mountPluginList()
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('manager 或 root')
   })
 })

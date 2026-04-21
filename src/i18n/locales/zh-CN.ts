@@ -39,6 +39,7 @@ export default {
     title: '系统管理登录',
     login: '登录',
     rootOnly: '仅 root 可访问 system-admin',
+    managerOnly: '仅 manager 或 root 可访问此页面',
     loginFailed: '登录失败，请稍后重试',
   },
   layout: {
@@ -50,6 +51,7 @@ export default {
     permissionCheckFailed: '权限验证失败，请稍后重试',
     logout: '退出登录',
     rootOnlyDenied: '仅 root 可访问 system-admin',
+    managerOnlyDenied: '仅 manager 或 root 可访问此页面',
     sessionExpired: '登录已失效，请重新登录',
   },
   permission: {
@@ -83,6 +85,8 @@ export default {
     pluginOrigin: '插件 Origin',
     pluginOriginPlaceholder: '根据 URL 自动生成',
     allowedHostOrigins: '允许嵌入主站',
+    accessScope: '菜单可见性',
+    accessScopePlaceholder: '选择宿主菜单可见性',
     pluginIdPlaceholder: '如: my-plugin',
     namePlaceholder: '插件显示名称',
     organizationPlaceholder: '选择组织，留空表示公共插件',
@@ -91,6 +95,12 @@ export default {
     allowedOriginPlaceholder: 'https://...',
     allowedHostOriginsPlaceholder: '输入主站 URL 后回车，可添加多个',
     allowedHostOriginsHint: '留空表示不限制主站；填写时会自动按 origin 归一化。',
+    accessScopes: {
+      authOnly: '已登录用户',
+      adminOnly: 'admin 或 root',
+      managerOnly: 'manager 或 root',
+      rootOnly: '仅 root',
+    },
     toggleConfirmTitle: '确认修改启用状态',
     enableConfirm: '确定启用插件 "{name}"？',
     disableConfirm: '确定停用插件 "{name}"？',

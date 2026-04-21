@@ -1,12 +1,17 @@
 import { Request, Response } from 'express';
 import { QueryRow, pluginPool } from '../db/pluginDb';
-import { hasPluginOrganizationNameColumn } from '../db/pluginSchema';
+import { hasPluginAccessScopeColumn, hasPluginOrganizationNameColumn } from '../db/pluginSchema';
 import {
   deriveOriginFromUrl,
   encodeJsonField,
   normalizeOriginList,
 } from '../utils/pluginData';
 import { error, paginated, success } from '../utils/response';
+
+const ACCESS_SCOPE_VALUES = ['auth-only', 'admin-only', 'manager-only', 'root-only'] as const;
+const DEFAULT_ACCESS_SCOPE = 'auth-only';
+
+type AccessScope = (typeof ACCESS_SCOPE_VALUES)[number];
 
 type PluginRow = QueryRow & {
   id: string;
@@ -20,6 +25,7 @@ type PluginRow = QueryRow & {
   allowed_origin: string | null;
   allowed_host_origins?: unknown;
   version: string | null;
+  access_scope?: string | null;
   organization_name: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -37,6 +43,7 @@ type SerializedPluginRow = {
   allowed_origin: string | null;
   allowed_host_origins: string[];
   version: string | null;
+  access_scope: AccessScope;
   organization_name: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -55,6 +62,7 @@ type NormalizedPluginPayload = {
   allowed_host_origins: string[];
   allowed_host_origins_db: unknown;
   version: unknown;
+  access_scope: AccessScope;
   organization_name: unknown;
 };
 
@@ -99,6 +107,20 @@ function handleDuplicateError(res: Response, err: unknown): boolean {
   return true;
 }
 
+function normalizeAccessScope(value: unknown): AccessScope | null {
+  if (value === undefined || value === null || value === '') {
+    return DEFAULT_ACCESS_SCOPE;
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  return (ACCESS_SCOPE_VALUES as readonly string[]).includes(value)
+    ? (value as AccessScope)
+    : null;
+}
+
 function buildPluginPayload(
   body: Record<string, unknown>,
   allowedHostOrigins: string[]
@@ -118,6 +140,7 @@ function buildPluginPayload(
     allowed_host_origins: allowedHostOrigins,
     allowed_host_origins_db: encodeJsonField(allowedHostOrigins),
     version: body.version ?? null,
+    access_scope: normalizeAccessScope(body.access_scope) ?? DEFAULT_ACCESS_SCOPE,
     organization_name: body.organization_name ?? null,
   };
 }
@@ -135,6 +158,7 @@ function serializePluginRow(row: PluginRow): SerializedPluginRow {
     allowed_origin: deriveOriginFromUrl(row.url) ?? row.allowed_origin,
     allowed_host_origins: normalizeOriginList(row.allowed_host_origins).origins,
     version: row.version,
+    access_scope: normalizeAccessScope(row.access_scope) ?? DEFAULT_ACCESS_SCOPE,
     organization_name: row.organization_name ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -207,6 +231,14 @@ export async function createPlugin(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  const accessScope = normalizeAccessScope(req.body?.access_scope);
+  if (accessScope === null) {
+    res.status(400).json(
+      error(4001, 'access_scope 必须是 auth-only、admin-only、manager-only 或 root-only')
+    );
+    return;
+  }
+
   const { origins: allowedHostOrigins, invalidEntries } = normalizeOriginList(
     req.body?.allowed_host_origins
   );
@@ -224,6 +256,7 @@ export async function createPlugin(req: Request, res: Response): Promise<void> {
 
   try {
     const hasOrganizationNameColumn = await hasPluginOrganizationNameColumn();
+    const hasAccessScopeColumn = await hasPluginAccessScopeColumn();
     const columns = [
       'id',
       'name',
@@ -250,6 +283,11 @@ export async function createPlugin(req: Request, res: Response): Promise<void> {
       payload.allowed_host_origins_db,
       payload.version,
     ];
+
+    if (hasAccessScopeColumn) {
+      columns.push('access_scope');
+      values.push(payload.access_scope);
+    }
 
     if (hasOrganizationNameColumn) {
       columns.push('organization_name');
@@ -278,6 +316,7 @@ export async function createPlugin(req: Request, res: Response): Promise<void> {
         allowed_origin: payload.allowed_origin,
         allowed_host_origins: payload.allowed_host_origins,
         version: payload.version,
+        access_scope: hasAccessScopeColumn ? payload.access_scope : DEFAULT_ACCESS_SCOPE,
         organization_name: hasOrganizationNameColumn ? payload.organization_name : null,
       })
     );
@@ -301,6 +340,7 @@ export async function updatePlugin(req: Request, res: Response): Promise<void> {
 
   try {
     const hasOrganizationNameColumn = await hasPluginOrganizationNameColumn();
+    const hasAccessScopeColumn = await hasPluginAccessScopeColumn();
     const [existingRows] = await pluginPool.query<PluginRow[]>(
       `
         SELECT *
@@ -366,6 +406,24 @@ export async function updatePlugin(req: Request, res: Response): Promise<void> {
 
     if (!hasOrganizationNameColumn && req.body?.organization_name !== undefined) {
       responseData.organization_name = null;
+    }
+
+    if (req.body?.access_scope !== undefined) {
+      const accessScope = normalizeAccessScope(req.body.access_scope);
+      if (accessScope === null) {
+        res.status(400).json(
+          error(4001, 'access_scope 必须是 auth-only、admin-only、manager-only 或 root-only')
+        );
+        return;
+      }
+
+      if (hasAccessScopeColumn) {
+        updates.push('`access_scope` = ?');
+        params.push(accessScope);
+      }
+      responseData.access_scope = hasAccessScopeColumn
+        ? accessScope
+        : DEFAULT_ACCESS_SCOPE;
     }
 
     if (req.body?.allowed_host_origins !== undefined) {

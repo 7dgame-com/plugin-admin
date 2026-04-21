@@ -5,6 +5,7 @@ type ColumnRow = QueryRow & {
 };
 
 let hasOrganizationNameColumnCache: boolean | null = null;
+let hasAccessScopeColumnCache: boolean | null = null;
 
 function parseBooleanOverride(value: string | undefined): boolean | null {
   if (value === undefined) {
@@ -46,6 +47,29 @@ export async function hasPluginOrganizationNameColumn(): Promise<boolean> {
   return hasOrganizationNameColumnCache;
 }
 
+export async function hasPluginAccessScopeColumn(): Promise<boolean> {
+  const override = parseBooleanOverride(process.env.PLUGIN_DB_HAS_ACCESS_SCOPE_COLUMN);
+  if (override !== null) {
+    return override;
+  }
+
+  if (process.env.NODE_ENV === 'test') {
+    return true;
+  }
+
+  if (hasAccessScopeColumnCache !== null) {
+    return hasAccessScopeColumnCache;
+  }
+
+  const [rows] = await pluginPool.query<ColumnRow[]>(
+    "SHOW COLUMNS FROM plugins LIKE 'access_scope'"
+  );
+
+  hasAccessScopeColumnCache = rows.length > 0;
+  return hasAccessScopeColumnCache;
+}
+
 export function resetPluginSchemaCacheForTests(): void {
   hasOrganizationNameColumnCache = null;
+  hasAccessScopeColumnCache = null;
 }

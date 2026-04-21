@@ -34,6 +34,24 @@ describe('Property 1: API baseURL 包含 /backend/api 前缀', () => {
     const { mainApi } = await import('../api/index')
     expect(mainApi.defaults.baseURL).toBe('/api/v1')
   })
+
+  it('verifyToken uses mainApi /plugin/verify-token instead of pluginApi', async () => {
+    const { verifyToken, mainApi } = await import('../api/index')
+    const getSpy = vi.spyOn(mainApi, 'get').mockResolvedValue({
+      data: {
+        code: 0,
+        data: {
+          id: 1,
+          username: 'root',
+          roles: ['root'],
+        },
+      },
+    } as never)
+
+    await verifyToken()
+
+    expect(getSpy).toHaveBeenCalledWith('/plugin/verify-token')
+  })
 })
 
 // Feature: system-admin-plugin-upgrade, Property 5: x-refresh-token 响应头自动持久化

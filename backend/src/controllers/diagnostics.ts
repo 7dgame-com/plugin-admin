@@ -1,6 +1,6 @@
-import axios from 'axios';
 import { Request, Response } from 'express';
 import { probePluginDb } from '../db/pluginDb';
+import { isValidHttpUrl, requestMainApiGet, resolveMainApiConfig } from '../utils/mainApi';
 import { success } from '../utils/response';
 
 type CheckStatus = 'ok' | 'reachable' | 'warning' | 'error';
@@ -36,22 +36,15 @@ function isValidIntegerSetting(
   return Number.isInteger(candidate) && predicate(candidate);
 }
 
-function isValidHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
 function resolveConfig() {
+  const mainApi = resolveMainApiConfig();
+
   return {
     portRaw: process.env.PORT,
     port: parseInteger(process.env.PORT, 8088),
-    mainApiUrl: process.env.MAIN_API_URL || 'http://localhost:8081',
     mainApiTimeoutMsRaw: process.env.MAIN_API_TIMEOUT_MS,
-    mainApiTimeoutMs: parseInteger(process.env.MAIN_API_TIMEOUT_MS, 5000),
+    mainApiTimeoutMs: mainApi.timeoutMs,
+    mainApi,
     pluginDbHost: process.env.PLUGIN_DB_HOST || 'localhost',
     pluginDbPortRaw: process.env.PLUGIN_DB_PORT,
     pluginDbPort: parseInteger(process.env.PLUGIN_DB_PORT, 3306),
@@ -65,16 +58,34 @@ function resolveConfig() {
 
 function buildConfigSummary(config = resolveConfig()): Record<string, ConfigResult> {
   const passwordPresent = config.pluginDbPassword.length > 0;
+  const mainApiSummary = config.mainApi.upstreams.reduce<Record<string, ConfigResult>>((summary, upstream) => {
+    summary[upstream.envKey] = {
+      status: isValidHttpUrl(upstream.url) ? 'ok' : 'error',
+      value: upstream.url,
+      note: upstream.envKey === 'APP_API_1_URL' && process.env.APP_API_1_URL === undefined
+        ? '未配置时默认回退到 http://localhost:8081'
+        : undefined,
+    };
+
+    if (upstream.weightEnvKey && process.env[upstream.weightEnvKey] !== undefined) {
+      summary[upstream.weightEnvKey] = {
+        status: Number.isInteger(Number(process.env[upstream.weightEnvKey]))
+          && Number(process.env[upstream.weightEnvKey]) > 0
+          ? 'ok'
+          : 'error',
+        value: process.env[upstream.weightEnvKey] as string,
+      };
+    }
+
+    return summary;
+  }, {});
 
   return {
     PORT: {
       status: isValidIntegerSetting(config.portRaw, config.port, (value) => value > 0 && value <= 65535) ? 'ok' : 'error',
       value: config.portRaw ?? config.port,
     },
-    MAIN_API_URL: {
-      status: isValidHttpUrl(config.mainApiUrl) ? 'ok' : 'error',
-      value: config.mainApiUrl,
-    },
+    ...mainApiSummary,
     MAIN_API_TIMEOUT_MS: {
       status: isValidIntegerSetting(config.mainApiTimeoutMsRaw, config.mainApiTimeoutMs, (value) => value > 0) ? 'ok' : 'error',
       value: config.mainApiTimeoutMsRaw ?? config.mainApiTimeoutMs,
@@ -135,24 +146,21 @@ function invalidUpstreamResult(target: string): CheckResult {
     status: 'error',
     target,
     latency_ms: 0,
-    error: 'MAIN_API_URL 配置不合法',
+    error: '主后端上游配置不合法',
   };
 }
 
 async function runUpstreamCheck(
-  target: string,
   timeout: number,
   mode: 'health' | 'verify-token'
 ): Promise<CheckResult> {
-  if (!isValidHttpUrl(target)) {
-    return invalidUpstreamResult(target);
-  }
-
   const startedAt = Date.now();
+  const path = mode === 'verify-token' ? '/v1/plugin/verify-token' : '/health';
 
   try {
-    const response = await axios.get(target, {
-      timeout,
+    const { response, target } = await requestMainApiGet(path, {
+      key: `diagnostics:${mode}`,
+      timeoutMs: timeout,
       headers: mode === 'verify-token' ? { Authorization: 'Bearer diagnostics-probe' } : undefined,
     });
 
@@ -165,8 +173,11 @@ async function runUpstreamCheck(
     };
   } catch (err) {
     const response = typeof err === 'object' && err !== null && 'response' in err
-      ? (err.response as { status: number } | undefined)
+      ? (err as { response?: { status: number } }).response
       : undefined;
+    const target = typeof err === 'object' && err !== null && 'target' in err
+      ? String((err as { target?: string }).target)
+      : path;
 
     if (response) {
       const reachable = mode === 'verify-token' && [401, 403].includes(response.status);
@@ -215,16 +226,9 @@ export async function getDiagnostics(_req: Request, res: Response): Promise<void
   const config = resolveConfig();
   const configSummary = buildConfigSummary(config);
 
-  const mainBackendHealthTarget = isValidHttpUrl(config.mainApiUrl)
-    ? new URL('/health', config.mainApiUrl).toString()
-    : config.mainApiUrl;
-  const mainBackendVerifyTokenTarget = isValidHttpUrl(config.mainApiUrl)
-    ? new URL('/v1/plugin/verify-token', config.mainApiUrl).toString()
-    : config.mainApiUrl;
-
   const [mainBackendHealth, mainBackendVerifyToken, pluginDb] = await Promise.all([
-    runUpstreamCheck(mainBackendHealthTarget, config.mainApiTimeoutMs, 'health'),
-    runUpstreamCheck(mainBackendVerifyTokenTarget, config.mainApiTimeoutMs, 'verify-token'),
+    runUpstreamCheck(config.mainApiTimeoutMs, 'health'),
+    runUpstreamCheck(config.mainApiTimeoutMs, 'verify-token'),
     runPluginDbCheck(config),
   ]);
 

@@ -39,6 +39,7 @@ export default {
     title: '系統管理登入',
     login: '登入',
     rootOnly: '僅 root 可存取 system-admin',
+    managerOnly: '僅 manager 或 root 可存取此頁面',
     loginFailed: '登入失敗，請稍後再試',
   },
   layout: {
@@ -50,6 +51,7 @@ export default {
     permissionCheckFailed: '權限驗證失敗，請稍後重試',
     logout: '登出',
     rootOnlyDenied: '僅 root 可存取 system-admin',
+    managerOnlyDenied: '僅 manager 或 root 可存取此頁面',
     sessionExpired: '登入已失效，請重新登入',
   },
   permission: {
@@ -83,6 +85,8 @@ export default {
     pluginOrigin: '外掛 Origin',
     pluginOriginPlaceholder: '根據 URL 自動產生',
     allowedHostOrigins: '允許嵌入主站',
+    accessScope: '選單可見性',
+    accessScopePlaceholder: '選擇宿主選單可見性',
     pluginIdPlaceholder: '如: my-plugin',
     namePlaceholder: '外掛顯示名稱',
     organizationPlaceholder: '選擇組織，留空表示公共外掛',
@@ -91,6 +95,12 @@ export default {
     allowedOriginPlaceholder: 'https://...',
     allowedHostOriginsPlaceholder: '輸入主站 URL 後按 Enter，可新增多個',
     allowedHostOriginsHint: '留空表示不限制主站；填寫時會自動按 origin 正規化。',
+    accessScopes: {
+      authOnly: '已登入使用者',
+      adminOnly: 'admin 或 root',
+      managerOnly: 'manager 或 root',
+      rootOnly: '僅 root',
+    },
     toggleConfirmTitle: '確認修改啟用狀態',
     enableConfirm: '確定啟用外掛 "{name}"？',
     disableConfirm: '確定停用外掛 "{name}"？',

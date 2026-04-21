@@ -114,6 +114,26 @@ describe('plugin-admin routes', () => {
     expect(pluginPool.query).not.toHaveBeenCalled();
   });
 
+  it('rejects reserved system-admin permission rules before hitting the database', async () => {
+    const app = createApp();
+
+    const response = await request(app)
+      .post('/api/v1/plugin-admin/create-permission')
+      .set('Authorization', 'Bearer token')
+      .send({
+        role_or_permission: 'admin',
+        plugin_name: 'system-admin',
+        action: 'manage-plugins',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      code: 4001,
+      message: 'system-admin 已改为仅按 root 登录态控制，不再支持插件权限配置',
+    });
+    expect(pluginPool.query).not.toHaveBeenCalled();
+  });
+
   it('validates plugin URLs during creation', async () => {
     const app = createApp();
 
@@ -144,6 +164,7 @@ describe('plugin-admin routes', () => {
         id: 'demo-plugin',
         name: 'Demo Plugin',
         url: 'https://plugin.example.com/app/index.html',
+        access_scope: 'manager-only',
         allowed_host_origins: [
           'https://main-a.example.com/admin',
           'https://main-b.example.com',
@@ -156,6 +177,7 @@ describe('plugin-admin routes', () => {
       expect.stringContaining('allowed_host_origins'),
       expect.arrayContaining([
         'https://plugin.example.com',
+        'manager-only',
         JSON.stringify([
           'https://main-a.example.com',
           'https://main-b.example.com',
@@ -165,6 +187,7 @@ describe('plugin-admin routes', () => {
     expect(response.body.data).toMatchObject({
       id: 'demo-plugin',
       allowed_origin: 'https://plugin.example.com',
+      access_scope: 'manager-only',
       allowed_host_origins: [
         'https://main-a.example.com',
         'https://main-b.example.com',
@@ -193,6 +216,7 @@ describe('plugin-admin routes', () => {
             allowed_host_origins:
               '["https://main-a.xrugc.com","https://main-b.xrugc.com"]',
             version: '1.0.0',
+            access_scope: 'root-only',
             domain: null,
             organization_name: null,
           },
@@ -208,6 +232,7 @@ describe('plugin-admin routes', () => {
       id: 'system-admin',
       organization_name: null,
       allowed_origin: 'https://system-admin.plugins.xrugc.com',
+      access_scope: 'root-only',
       allowed_host_origins: [
         'https://main-a.xrugc.com',
         'https://main-b.xrugc.com',
@@ -237,8 +262,29 @@ describe('plugin-admin routes', () => {
     expect(pluginPool.query).toHaveBeenCalledTimes(1);
     const [sql, params] = pluginPool.query.mock.calls[0] as [string, unknown[]];
     expect(sql).not.toContain('organization_name');
-    expect(params).toHaveLength(11);
+    expect(params).toHaveLength(12);
     expect(response.body.data.organization_name).toBeNull();
+  });
+
+  it('rejects invalid access_scope values during creation', async () => {
+    const app = createApp();
+
+    const response = await request(app)
+      .post('/api/v1/plugin-admin/create-plugin')
+      .set('Authorization', 'Bearer token')
+      .send({
+        id: 'demo-plugin',
+        name: 'Demo Plugin',
+        url: 'https://plugin.example.com/app/index.html',
+        access_scope: 'staff-only',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      code: 4001,
+      message: 'access_scope 必须是 auth-only、admin-only、manager-only 或 root-only',
+    });
+    expect(pluginPool.query).not.toHaveBeenCalled();
   });
 
   it('skips organization_name writes when the plugins table is still on the legacy schema during update', async () => {

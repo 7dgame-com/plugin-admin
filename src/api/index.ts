@@ -196,3 +196,6 @@ export interface OrganizationItem {
 
 // 组织只读列表 API（主后端）
 export const getOrganizations = () => mainApi.get('/organization/list')
+
+export const verifyToken = () =>
+  mainApi.get('/plugin/verify-token')

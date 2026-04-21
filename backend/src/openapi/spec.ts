@@ -246,23 +246,6 @@ export const openApiDocument = {
         },
       },
     },
-    '/api/v1/plugin/verify-token': {
-      get: {
-        tags: ['Public Plugin API'],
-        summary: 'Proxy token verification to the main API service',
-        responses: {
-          '200': {
-            description: 'Verification result proxied from the main API',
-            content: jsonContent({
-              type: 'object',
-              additionalProperties: true,
-            }),
-          },
-          '401': errorResponse('Token invalid'),
-          '502': errorResponse('Main API request failed'),
-        },
-      },
-    },
   },
   components: {
     securitySchemes: {
@@ -391,6 +374,10 @@ export const openApiDocument = {
             items: { type: 'string' },
           },
           version: { type: 'string', nullable: true },
+          access_scope: {
+            type: 'string',
+            enum: ['auth-only', 'admin-only', 'manager-only', 'root-only'],
+          },
           organization_name: { type: 'string', nullable: true },
           created_at: { type: 'string', nullable: true },
           updated_at: { type: 'string', nullable: true },
@@ -444,6 +431,10 @@ export const openApiDocument = {
             items: { type: 'string' },
           },
           version: { type: 'string', nullable: true },
+          access_scope: {
+            type: 'string',
+            enum: ['auth-only', 'admin-only', 'manager-only', 'root-only'],
+          },
           organization_name: { type: 'string', nullable: true },
         },
       },
@@ -465,6 +456,10 @@ export const openApiDocument = {
             items: { type: 'string' },
           },
           version: { type: 'string', nullable: true },
+          access_scope: {
+            type: 'string',
+            enum: ['auth-only', 'admin-only', 'manager-only', 'root-only'],
+          },
           organization_name: { type: 'string', nullable: true },
         },
       },
@@ -544,6 +539,10 @@ export const openApiDocument = {
           allowedHostOrigins: {
             type: 'array',
             items: { type: 'string' },
+          },
+          accessScope: {
+            type: 'string',
+            enum: ['auth-only', 'admin-only', 'manager-only', 'root-only'],
           },
           version: { type: 'string', nullable: true },
         },

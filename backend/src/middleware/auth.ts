@@ -1,8 +1,5 @@
-import axios from 'axios';
 import { NextFunction, Request, Response } from 'express';
-
-const MAIN_API_URL = process.env.MAIN_API_URL || 'http://localhost:8081';
-const MAIN_API_TIMEOUT_MS = Number(process.env.MAIN_API_TIMEOUT_MS || 5000);
+import { requestMainApiGet } from '../utils/mainApi';
 
 export interface UserOrganizationSummary {
   id: number;
@@ -58,14 +55,15 @@ function parseOrganizations(rawOrganizations: unknown): UserOrganizationSummary[
 }
 
 export async function verifyBearerToken(token: string): Promise<UserInfo | null> {
-  const response = await axios.get(`${MAIN_API_URL}/v1/plugin/verify-token`, {
+  const { response } = await requestMainApiGet('/v1/plugin/verify-token', {
+    key: token,
     headers: {
       Authorization: `Bearer ${token}`,
     },
-    timeout: MAIN_API_TIMEOUT_MS,
   });
 
-  const payload = response.data?.data ?? response.data;
+  const data = response.data as { data?: Record<string, unknown> } | Record<string, unknown> | undefined;
+  const payload = (((data && 'data' in data) ? data.data : undefined) ?? data ?? {}) as Record<string, unknown>;
   const rawUserId = payload?.user_id ?? payload?.id;
   const userId = Number(rawUserId);
 
@@ -111,7 +109,13 @@ export async function auth(req: Request, res: Response, next: NextFunction): Pro
     (req as AuthenticatedRequest).user = user;
     next();
   } catch (err) {
-    if (axios.isAxiosError(err) && (err.response?.status === 401 || err.response?.status === 403)) {
+    if (
+      typeof err === 'object'
+      && err !== null
+      && 'response' in err
+      && ((err as { response?: { status?: number } }).response?.status === 401
+        || (err as { response?: { status?: number } }).response?.status === 403)
+    ) {
       invalidTokenResponse(res);
       return;
     }

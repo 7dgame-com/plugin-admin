@@ -14,6 +14,11 @@
             <span>{{ getOrganizationLabel(row.organization_name) }}</span>
           </template>
         </el-table-column>
+        <el-table-column :label="t('plugin.accessScope')" min-width="150">
+          <template #default="{ row }">
+            <span>{{ getAccessScopeLabel(row.access_scope) }}</span>
+          </template>
+        </el-table-column>
         <el-table-column :label="t('common.enabled')" width="80">
           <template #default="{ row }">
             <el-switch
@@ -70,6 +75,18 @@
               :label="organization.title"
               :value="organization.name"
             />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('plugin.accessScope')">
+          <el-select
+            v-model="form.access_scope"
+            :placeholder="t('plugin.accessScopePlaceholder')"
+            style="width: 100%"
+          >
+            <el-option :label="t('plugin.accessScopes.authOnly')" value="auth-only" />
+            <el-option :label="t('plugin.accessScopes.adminOnly')" value="admin-only" />
+            <el-option :label="t('plugin.accessScopes.managerOnly')" value="manager-only" />
+            <el-option :label="t('plugin.accessScopes.rootOnly')" value="root-only" />
           </el-select>
         </el-form-item>
         <el-form-item :label="t('common.icon')">
@@ -141,6 +158,7 @@ interface PluginItem {
   name: string
   url: string
   organization_name: string | null
+  access_scope: 'auth-only' | 'admin-only' | 'manager-only' | 'root-only'
   enabled: number
   version: string | null
   icon: string | null
@@ -166,6 +184,7 @@ const form = reactive({
   name: '',
   url: '',
   organization_name: '',
+  access_scope: 'auth-only' as PluginItem['access_scope'],
   icon: '',
   enabled: true,
   order: 0,
@@ -187,6 +206,19 @@ function getOrganizationLabel(organizationName: string | null) {
 
   const organization = organizations.value.find((item) => item.name === organizationName)
   return organization?.title || organizationName
+}
+
+function getAccessScopeLabel(accessScope: PluginItem['access_scope']) {
+  switch (accessScope) {
+    case 'admin-only':
+      return t('plugin.accessScopes.adminOnly')
+    case 'manager-only':
+      return t('plugin.accessScopes.managerOnly')
+    case 'root-only':
+      return t('plugin.accessScopes.rootOnly')
+    default:
+      return t('plugin.accessScopes.authOnly')
+  }
 }
 
 function getOriginFromUrl(value: string) {
@@ -295,6 +327,7 @@ function resetForm() {
     name: '',
     url: '',
     organization_name: '',
+    access_scope: 'auth-only',
     icon: '',
     enabled: true,
     order: 0,
@@ -317,6 +350,7 @@ function openEditDialog(row: PluginItem) {
     name: row.name,
     url: row.url,
     organization_name: row.organization_name || '',
+    access_scope: row.access_scope || 'auth-only',
     icon: row.icon || '',
     enabled: !!row.enabled,
     order: row.order,
