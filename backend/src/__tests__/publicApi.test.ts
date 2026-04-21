@@ -216,6 +216,73 @@ describe('public API routes', () => {
     });
   });
 
+  it('falls back to the public plugin list when optional bearer verification is rejected', async () => {
+    const app = createApp();
+
+    mockedAxios.isAxiosError.mockReturnValueOnce(true);
+    mockedAxios.get.mockRejectedValueOnce({
+      response: { status: 401 },
+    });
+
+    pluginPool.query.mockResolvedValueOnce([
+      [
+        {
+          id: 'ai-3d-generator-v3',
+          name: 'AI 3D 生成器 V3',
+          name_i18n: null,
+          description: 'public',
+          url: 'https://a23.plugins.xrugc.com/',
+          icon: 'MagicStick',
+          enabled: 1,
+          order: 0,
+          allowed_origin: null,
+          allowed_host_origins: null,
+          version: '1.0.0',
+          access_scope: 'auth-only',
+          organization_name: null,
+        },
+      ],
+    ]);
+
+    const response = await request(app)
+      .get('/api/v1/plugin/list')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    const [sql] = pluginPool.query.mock.calls[0] as [string];
+    const normalizedSql = sql.replace(/\s+/g, ' ').trim();
+    expect(normalizedSql).toContain('organization_name IS NULL');
+    expect(response.body).toEqual({
+      version: '1.0.0',
+      menuGroups: [
+        {
+          id: 'org:public',
+          name: '公共插件',
+          nameI18n: null,
+          icon: 'Grid',
+          order: 0,
+        },
+      ],
+      plugins: [
+        {
+          id: 'ai-3d-generator-v3',
+          name: 'AI 3D 生成器 V3',
+          nameI18n: null,
+          description: 'public',
+          url: 'https://a23.plugins.xrugc.com/',
+          icon: 'MagicStick',
+          group: 'org:public',
+          enabled: true,
+          order: 0,
+          allowedOrigin: 'https://a23.plugins.xrugc.com',
+          allowedHostOrigins: [],
+          accessScope: 'auth-only',
+          version: '1.0.0',
+        },
+      ],
+    });
+  });
+
   it('verifies plugin list bearer tokens against their issuer host', async () => {
     const app = createApp();
 

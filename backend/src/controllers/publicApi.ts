@@ -81,33 +81,31 @@ export async function list(req: Request, res: Response): Promise<void> {
 
   if (authorization !== undefined) {
     if (!authorization.startsWith('Bearer ')) {
-      res.status(401).json(error(1001, 'Token 无效或已过期'));
-      return;
-    }
-
-    const token = authorization.slice(7).trim();
-    if (token === '') {
-      res.status(401).json(error(1001, 'Token 无效或已过期'));
-      return;
-    }
-
-    try {
-      const user = await verifyBearerToken(token, req);
-      if (!user) {
-        res.status(401).json(error(1001, 'Token 无效或已过期'));
-        return;
+      organizations = [];
+      roles = [];
+    } else {
+      const token = authorization.slice(7).trim();
+      if (token === '') {
+        organizations = [];
+        roles = [];
+      } else {
+        try {
+          const user = await verifyBearerToken(token, req);
+          if (user) {
+            organizations = user.organizations ?? [];
+            roles = user.roles ?? [];
+          }
+        } catch (err) {
+          if (axios.isAxiosError(err) && (err.response?.status === 401 || err.response?.status === 403)) {
+            organizations = [];
+            roles = [];
+          } else {
+            const message = err instanceof Error ? err.message : '未知错误';
+            res.status(502).json(error(1001, `调用 verify-token 失败: ${message}`));
+            return;
+          }
+        }
       }
-      organizations = user.organizations ?? [];
-      roles = user.roles ?? [];
-    } catch (err) {
-      if (axios.isAxiosError(err) && (err.response?.status === 401 || err.response?.status === 403)) {
-        res.status(401).json(error(1001, 'Token 无效或已过期'));
-        return;
-      }
-
-      const message = err instanceof Error ? err.message : '未知错误';
-      res.status(502).json(error(1001, `调用 verify-token 失败: ${message}`));
-      return;
     }
   }
 
