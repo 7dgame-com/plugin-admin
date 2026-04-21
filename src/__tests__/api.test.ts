@@ -147,6 +147,39 @@ describe('Property 6: 两段式 token 刷新顺序', () => {
     )
   })
 
+  it('waits for the parent token before sending the first embedded request', async () => {
+    mockIsInIframe.mockReturnValue(true)
+    mockRequestParentTokenRefresh.mockResolvedValue({ accessToken: 'parent-token' })
+
+    const { default: adminApi } = await import('../api/index')
+
+    let callCount = 0
+    const originalAdapter = adminApi.defaults.adapter
+    adminApi.defaults.adapter = async (config: import('axios').InternalAxiosRequestConfig) => {
+      callCount += 1
+      expect(config.headers.Authorization).toBe('Bearer parent-token')
+
+      return {
+        status: 200,
+        statusText: 'OK',
+        data: { ok: true },
+        headers: {},
+        config,
+      }
+    }
+
+    try {
+      const response = await adminApi.get('/test')
+
+      expect(response.data).toEqual({ ok: true })
+      expect(callCount).toBe(1)
+      expect(mockRequestParentTokenRefresh).toHaveBeenCalledTimes(1)
+      expect(localStorage.getItem('system-admin-token')).toBe('parent-token')
+    } finally {
+      adminApi.defaults.adapter = originalAdapter
+    }
+  })
+
   it('uses /api/v1/auth/refresh in standalone mode and retries with the new bearer token', async () => {
     mockIsInIframe.mockReturnValue(false)
     localStorage.setItem('system-admin-refresh-token', 'refresh-1')
