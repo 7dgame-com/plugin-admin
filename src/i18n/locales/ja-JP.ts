@@ -39,6 +39,7 @@ export default {
     title: 'システム管理ログイン',
     login: 'ログイン',
     rootOnly: 'system-admin にアクセスできるのは root のみです',
+    managerOnly: 'このページにアクセスできるのは manager または root のみです',
     loginFailed: 'ログインに失敗しました。時間をおいて再試行してください。',
   },
   layout: {
@@ -50,6 +51,7 @@ export default {
     permissionCheckFailed: '権限の確認に失敗しました。後でもう一度お試しください',
     logout: 'ログアウト',
     rootOnlyDenied: 'system-admin にアクセスできるのは root のみです',
+    managerOnlyDenied: 'このページにアクセスできるのは manager または root のみです',
     sessionExpired: 'セッションの有効期限が切れました。再度ログインしてください。',
   },
   permission: {
@@ -83,6 +85,8 @@ export default {
     pluginOrigin: 'プラグイン Origin',
     pluginOriginPlaceholder: 'URL から自動計算',
     allowedHostOrigins: '許可するホスト Origin',
+    accessScope: 'メニュー表示範囲',
+    accessScopePlaceholder: 'ホストメニューでの表示対象を選択',
     pluginIdPlaceholder: '例: my-plugin',
     namePlaceholder: 'プラグイン表示名',
     organizationPlaceholder: '組織を選択。未選択なら共通プラグイン',
@@ -91,6 +95,15 @@ export default {
     allowedOriginPlaceholder: 'https://...',
     allowedHostOriginsPlaceholder: 'ホスト URL を入力して Enter。複数追加できます',
     allowedHostOriginsHint: '空欄なら全ホストを許可します。入力値は origin に正規化されます。',
+    accessScopes: {
+      authOnly: 'ログイン済みユーザー',
+      adminOnly: 'admin または root',
+      managerOnly: 'manager または root',
+      rootOnly: 'root のみ',
+    },
+    toggleConfirmTitle: '有効状態の変更を確認',
+    enableConfirm: 'プラグイン "{name}" を有効にしますか？',
+    disableConfirm: 'プラグイン "{name}" を無効にしますか？',
     deleteConfirm: 'プラグイン "{name}" を削除しますか？',
     messages: {
       loadFailed: 'プラグイン一覧の読み込みに失敗しました',

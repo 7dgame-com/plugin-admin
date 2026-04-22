@@ -1,12 +1,12 @@
 <template>
   <div class="app-layout">
     <div
-      v-if="sidebarOpen && hasAny()"
+      v-if="sidebarOpen && showNavigation"
       class="sidebar-overlay"
       @click="sidebarOpen = false"
     />
 
-    <aside v-if="hasAny()" class="sidebar" :class="{ open: sidebarOpen }">
+    <aside v-if="showNavigation" class="sidebar" :class="{ open: sidebarOpen }">
       <div class="sidebar-header">
         <span class="sidebar-title">{{ t('layout.title') }}</span>
         <button class="sidebar-close" @click="sidebarOpen = false">
@@ -15,7 +15,6 @@
       </div>
       <nav class="sidebar-nav">
         <router-link
-          v-if="can('manage-permissions')"
           to="/permissions"
           class="sidebar-item"
           :class="{ active: $route.path === '/permissions' }"
@@ -25,7 +24,6 @@
           <span>{{ t('permission.title') }}</span>
         </router-link>
         <router-link
-          v-if="can('manage-plugins')"
           to="/plugins"
           class="sidebar-item"
           :class="{ active: $route.path === '/plugins' }"
@@ -35,7 +33,6 @@
           <span>{{ t('plugin.title') }}</span>
         </router-link>
         <router-link
-          v-if="can('manage-organizations')"
           to="/organizations"
           class="sidebar-item"
           :class="{ active: $route.path === '/organizations' }"
@@ -49,7 +46,7 @@
 
     <div class="main-area">
       <header class="navbar">
-        <button v-if="hasAny()" class="menu-btn" @click="sidebarOpen = true">
+        <button v-if="showNavigation" class="menu-btn" @click="sidebarOpen = true">
           <el-icon :size="20"><Fold /></el-icon>
         </button>
         <h1 class="navbar-title">{{ $route.meta.title || '系统管理' }}</h1>
@@ -70,11 +67,10 @@
         </div>
       </header>
       <main class="content">
-        <!-- 等待权限和用户信息加载完成 -->
         <div v-if="!ready" class="loading-state">
           <el-icon class="is-loading" :size="24"><Loading /></el-icon>
         </div>
-        <div v-else-if="loaded && !hasAny()" class="no-permission">
+        <div v-else-if="showNoPermission" class="no-permission">
           <el-empty :description="t('layout.noPermission')" />
         </div>
         <router-view v-else />
@@ -84,26 +80,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Close, Fold, Key, Grid, OfficeBuilding, User, Loading } from '@element-plus/icons-vue'
-import { pluginApi } from '../api'
-import { usePermissions } from '../composables/usePermissions'
+import { useAuthSession } from '../composables/useAuthSession'
 import { getRuntimeMode, removeAllTokens } from '../utils/token'
 
 const router = useRouter()
 const { t } = useI18n()
-const { fetchPermissions, can, hasAny, loaded } = usePermissions()
+const { user, isRootUser, fetchSession } = useAuthSession()
 
 const sidebarOpen = ref(false)
-const userInfo = ref<{
-  username: string
-  nickname?: string
-  roles: string[]
-  organizations?: Array<{ id: number; name: string; title: string }>
-} | null>(null)
 const ready = ref(false)
+const userInfo = computed(() => user.value)
+const showNavigation = computed(() => ready.value && isRootUser.value)
+const showNoPermission = computed(() => ready.value && !isRootUser.value)
 
 async function handleLogout() {
   removeAllTokens()
@@ -118,18 +110,15 @@ async function handleLogout() {
 
 onMounted(async () => {
   try {
-    const [{ data }] = await Promise.all([
-      pluginApi.get('/verify-token', {
-        params: { plugin_name: 'system-admin' }
-      }),
-      fetchPermissions(),
-    ])
-    if (data.code === 0) {
-      userInfo.value = data.data
+    await fetchSession()
+    if (!isRootUser.value) {
+      await router.replace({ name: 'NotAllowed', query: { reason: 'root' } })
     }
   } catch (error) {
     const status = (error as { response?: { status?: number } })?.response?.status
-    if (status === 403) {
+    if (status === 401 && getRuntimeMode() === 'standalone') {
+      await router.replace({ name: 'Login' })
+    } else if (status === 401 || status === 403) {
       await router.replace({ name: 'NotAllowed', query: { reason: 'root' } })
     }
   } finally {

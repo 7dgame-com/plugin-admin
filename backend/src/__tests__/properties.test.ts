@@ -981,6 +981,7 @@ describe('property tests', () => {
           };
           const responseGroupIds = responseBody.menuGroups.map((group) => group.id);
           expect(new Set(responseGroupIds).size).toBe(responseGroupIds.length);
+          const hasVisibleOrganizationPlugins = organizationPlugins.some((plugin) => plugin.enabled === 1);
           expect(responseBody.menuGroups).toEqual([
             {
               id: 'org:public',
@@ -989,13 +990,17 @@ describe('property tests', () => {
               icon: 'Grid',
               order: 0,
             },
-            {
-              id: `org:${ORGANIZATION_NAME}`,
-              name: ORGANIZATION_TITLE,
-              nameI18n: null,
-              icon: 'OfficeBuilding',
-              order: 1,
-            },
+            ...(hasVisibleOrganizationPlugins
+              ? [
+                  {
+                    id: `org:${ORGANIZATION_NAME}`,
+                    name: ORGANIZATION_TITLE,
+                    nameI18n: null,
+                    icon: 'OfficeBuilding',
+                    order: 1,
+                  },
+                ]
+              : []),
           ]);
 
           const responsePlugins = responseBody.plugins;

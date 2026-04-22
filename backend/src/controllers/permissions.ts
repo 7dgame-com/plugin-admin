@@ -2,6 +2,9 @@ import { Request, Response } from 'express';
 import { MutationResult, QueryRow, pluginPool } from '../db/pluginDb';
 import { error, paginated, success } from '../utils/response';
 
+const RESERVED_PLUGIN_NAME = 'system-admin';
+const RESERVED_PLUGIN_MESSAGE = 'system-admin 已改为仅按 root 登录态控制，不再支持插件权限配置';
+
 type PermissionRow = QueryRow & {
   id: number;
   role_or_permission: string;
@@ -46,6 +49,10 @@ function handleDuplicateError(res: Response, err: unknown): boolean {
   return true;
 }
 
+function isReservedPluginName(value: unknown): boolean {
+  return typeof value === 'string' && value.trim() === RESERVED_PLUGIN_NAME;
+}
+
 export async function listPermissions(req: Request, res: Response): Promise<void> {
   const roleOrPermission = typeof req.query.role_or_permission === 'string' ? req.query.role_or_permission : '';
   const pluginName = typeof req.query.plugin_name === 'string' ? req.query.plugin_name : '';
@@ -53,8 +60,8 @@ export async function listPermissions(req: Request, res: Response): Promise<void
   const page = asPositiveInt(req.query.page, 1);
   const perPage = asPositiveInt(req.query.per_page, 20);
 
-  const filters: string[] = [];
-  const params: unknown[] = [];
+  const filters: string[] = ['plugin_name <> ?'];
+  const params: unknown[] = [RESERVED_PLUGIN_NAME];
 
   if (roleOrPermission !== '') {
     filters.push('role_or_permission LIKE ?');
@@ -125,6 +132,11 @@ export async function createPermission(req: Request, res: Response): Promise<voi
     return;
   }
 
+  if (isReservedPluginName(pluginName)) {
+    res.status(400).json(error(4001, RESERVED_PLUGIN_MESSAGE));
+    return;
+  }
+
   try {
     const [result] = await pluginPool.query<MutationResult>(
       `
@@ -192,6 +204,10 @@ export async function updatePermission(req: Request, res: Response): Promise<voi
       res.status(400).json(error(4001, validationError));
       return;
     }
+    if (isReservedPluginName(pluginName)) {
+      res.status(400).json(error(4001, RESERVED_PLUGIN_MESSAGE));
+      return;
+    }
     updates.push('plugin_name = ?');
     params.push(pluginName);
   }
@@ -220,6 +236,11 @@ export async function updatePermission(req: Request, res: Response): Promise<voi
     const existing = existingRows[0];
     if (!existing) {
       res.status(404).json(error(4004, '记录不存在'));
+      return;
+    }
+
+    if (isReservedPluginName(existing.plugin_name)) {
+      res.status(400).json(error(4001, RESERVED_PLUGIN_MESSAGE));
       return;
     }
 

@@ -1,8 +1,5 @@
-import axios from 'axios';
 import { NextFunction, Request, Response } from 'express';
-
-const MAIN_API_URL = process.env.MAIN_API_URL || 'http://localhost:8081';
-const MAIN_API_TIMEOUT_MS = Number(process.env.MAIN_API_TIMEOUT_MS || 5000);
+import { requestMainApiGet } from '../utils/mainApi';
 
 export interface UserOrganizationSummary {
   id: number;
@@ -57,15 +54,120 @@ function parseOrganizations(rawOrganizations: unknown): UserOrganizationSummary[
   });
 }
 
-export async function verifyBearerToken(token: string): Promise<UserInfo | null> {
-  const response = await axios.get(`${MAIN_API_URL}/v1/plugin/verify-token`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    timeout: MAIN_API_TIMEOUT_MS,
+function normalizeHeaderValue(value: string | string[] | undefined): string | undefined {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  const normalized = rawValue?.split(',')[0]?.trim();
+  return normalized === '' ? undefined : normalized;
+}
+
+function parseUrlHeader(value: string | undefined): URL | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    return new URL(value);
+  } catch {
+    return undefined;
+  }
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> | undefined {
+  const payload = token.split('.')[1];
+  if (!payload) {
+    return undefined;
+  }
+
+  try {
+    const decoded = Buffer.from(payload, 'base64url').toString('utf8');
+    const parsed = JSON.parse(decoded) as unknown;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function parseTokenIssuerContext(token: string): { host: string; proto: string } | undefined {
+  const issuer = decodeJwtPayload(token)?.iss;
+  if (typeof issuer !== 'string') {
+    return undefined;
+  }
+
+  const issuerUrl = parseUrlHeader(issuer);
+  if (!issuerUrl || !['http:', 'https:'].includes(issuerUrl.protocol) || !issuerUrl.host) {
+    return undefined;
+  }
+
+  return {
+    host: issuerUrl.host,
+    proto: issuerUrl.protocol.replace(/:$/, ''),
+  };
+}
+
+function buildTokenVerificationHeaders(token: string, req?: Request): Record<string, string> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+  };
+  const issuerContext = parseTokenIssuerContext(token);
+
+  if (issuerContext) {
+    // Main API signs JWTs with request hostInfo, so verify against the token issuer host.
+    headers.Host = issuerContext.host;
+    headers['X-Forwarded-Host'] = issuerContext.host;
+    headers['X-Forwarded-Proto'] = issuerContext.proto;
+  }
+
+  if (!req) {
+    return headers;
+  }
+
+  const originUrl = parseUrlHeader(normalizeHeaderValue(req.headers.origin));
+  const refererUrl = parseUrlHeader(normalizeHeaderValue(req.headers.referer));
+  const browserUrl = originUrl ?? refererUrl;
+  const forwardedHost = normalizeHeaderValue(req.headers['x-forwarded-host'])
+    ?? normalizeHeaderValue(req.headers['x-original-host'])
+    ?? browserUrl?.host
+    ?? normalizeHeaderValue(req.headers.host);
+  const forwardedProto = issuerContext?.proto
+    ?? normalizeHeaderValue(req.headers['x-forwarded-proto'])
+    ?? browserUrl?.protocol.replace(/:$/, '')
+    ?? (req.protocol || undefined);
+  const forwardedFor = normalizeHeaderValue(req.headers['x-forwarded-for']);
+  const realIp = normalizeHeaderValue(req.headers['x-real-ip']);
+
+  if (issuerContext) {
+    if (forwardedHost) {
+      headers['X-Original-Host'] = forwardedHost;
+    }
+  } else if (forwardedHost) {
+    headers['X-Forwarded-Host'] = forwardedHost;
+  }
+
+  if (forwardedProto) {
+    headers['X-Forwarded-Proto'] = forwardedProto;
+  }
+
+  if (forwardedFor) {
+    headers['X-Forwarded-For'] = forwardedFor;
+  }
+
+  if (realIp) {
+    headers['X-Real-IP'] = realIp;
+  }
+
+  return headers;
+}
+
+export async function verifyBearerToken(token: string, req?: Request): Promise<UserInfo | null> {
+  const { response } = await requestMainApiGet('/v1/plugin/verify-token', {
+    key: token,
+    headers: buildTokenVerificationHeaders(token, req),
   });
 
-  const payload = response.data?.data ?? response.data;
+  const data = response.data as { data?: Record<string, unknown> } | Record<string, unknown> | undefined;
+  const payload = (((data && 'data' in data) ? data.data : undefined) ?? data ?? {}) as Record<string, unknown>;
   const rawUserId = payload?.user_id ?? payload?.id;
   const userId = Number(rawUserId);
 
@@ -102,7 +204,7 @@ export async function auth(req: Request, res: Response, next: NextFunction): Pro
   }
 
   try {
-    const user = await verifyBearerToken(token);
+    const user = await verifyBearerToken(token, req);
     if (!user) {
       invalidTokenResponse(res);
       return;
@@ -111,7 +213,13 @@ export async function auth(req: Request, res: Response, next: NextFunction): Pro
     (req as AuthenticatedRequest).user = user;
     next();
   } catch (err) {
-    if (axios.isAxiosError(err) && (err.response?.status === 401 || err.response?.status === 403)) {
+    if (
+      typeof err === 'object'
+      && err !== null
+      && 'response' in err
+      && ((err as { response?: { status?: number } }).response?.status === 401
+        || (err as { response?: { status?: number } }).response?.status === 403)
+    ) {
       invalidTokenResponse(res);
       return;
     }

@@ -16,11 +16,20 @@ const route = useRoute()
 const { t } = useI18n()
 
 const isRootOnly = computed(() => route.query.reason === 'root')
+const isManagerOnly = computed(() => route.query.reason === 'manager')
 const description = computed(() =>
-  isRootOnly.value ? t('layout.rootOnlyDenied') : t('layout.permissionDenied')
+  isRootOnly.value
+    ? t('layout.rootOnlyDenied')
+    : isManagerOnly.value
+      ? t('layout.managerOnlyDenied')
+      : t('layout.permissionDenied')
 )
 const hint = computed(() =>
-  isRootOnly.value ? t('auth.rootOnly') : t('layout.noPermission')
+  isRootOnly.value
+    ? t('auth.rootOnly')
+    : isManagerOnly.value
+      ? t('auth.managerOnly')
+      : t('layout.noPermission')
 )
 </script>
 

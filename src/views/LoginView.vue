@@ -37,7 +37,7 @@
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { authApi, pluginApi } from '../api'
+import { authApi, verifyToken } from '../api'
 import { removeAllTokens, setRefreshToken, setToken } from '../utils/token'
 
 const route = useRoute()
@@ -93,9 +93,7 @@ async function submit() {
     setToken(tokenPayload.accessToken)
     setRefreshToken(tokenPayload.refreshToken)
 
-    const verifyResponse = await pluginApi.get('/verify-token', {
-      params: { plugin_name: 'system-admin' },
-    })
+    const verifyResponse = await verifyToken()
     const roles = verifyResponse.data?.data?.roles ?? []
 
     if (!Array.isArray(roles) || !roles.includes('root')) {

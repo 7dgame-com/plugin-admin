@@ -1,13 +1,14 @@
 import axios from 'axios';
 import { Request, Response } from 'express';
 import { QueryRow, pluginPool } from '../db/pluginDb';
+import { hasPluginOrganizationNameColumn } from '../db/pluginSchema';
 import { AuthenticatedRequest, UserOrganizationSummary, verifyBearerToken } from '../middleware/auth';
 import { getAllowedActions, hasPermission } from '../middleware/permission';
 import { decodeJsonField, deriveOriginFromUrl, normalizeOriginList } from '../utils/pluginData';
 import { error, success } from '../utils/response';
 
-const MAIN_API_URL = process.env.MAIN_API_URL || 'http://localhost:8081';
-const MAIN_API_TIMEOUT_MS = Number(process.env.MAIN_API_TIMEOUT_MS || 5000);
+const DEFAULT_ACCESS_SCOPE = 'auth-only';
+const ACCESS_SCOPE_VALUES = new Set(['auth-only', 'admin-only', 'manager-only', 'root-only']);
 
 type PluginRow = QueryRow & {
   id: string;
@@ -21,8 +22,15 @@ type PluginRow = QueryRow & {
   allowed_origin: string | null;
   allowed_host_origins?: unknown;
   version: string | null;
+  access_scope?: string | null;
   organization_name: string | null;
 };
+
+function normalizeAccessScope(value: unknown): string {
+  return typeof value === 'string' && ACCESS_SCOPE_VALUES.has(value)
+    ? value
+    : DEFAULT_ACCESS_SCOPE;
+}
 
 export async function checkPermission(req: Request, res: Response): Promise<void> {
   const pluginName = typeof req.query.plugin_name === 'string' ? req.query.plugin_name : '';
@@ -69,39 +77,40 @@ export async function allowedActions(req: Request, res: Response): Promise<void>
 export async function list(req: Request, res: Response): Promise<void> {
   const authorization = req.headers?.authorization;
   let organizations: UserOrganizationSummary[] = [];
+  let roles: string[] = [];
 
   if (authorization !== undefined) {
     if (!authorization.startsWith('Bearer ')) {
-      res.status(401).json(error(1001, 'Token 无效或已过期'));
-      return;
-    }
-
-    const token = authorization.slice(7).trim();
-    if (token === '') {
-      res.status(401).json(error(1001, 'Token 无效或已过期'));
-      return;
-    }
-
-    try {
-      const user = await verifyBearerToken(token);
-      if (!user) {
-        res.status(401).json(error(1001, 'Token 无效或已过期'));
-        return;
+      organizations = [];
+      roles = [];
+    } else {
+      const token = authorization.slice(7).trim();
+      if (token === '') {
+        organizations = [];
+        roles = [];
+      } else {
+        try {
+          const user = await verifyBearerToken(token, req);
+          if (user) {
+            organizations = user.organizations ?? [];
+            roles = user.roles ?? [];
+          }
+        } catch (err) {
+          if (axios.isAxiosError(err) && (err.response?.status === 401 || err.response?.status === 403)) {
+            organizations = [];
+            roles = [];
+          } else {
+            const message = err instanceof Error ? err.message : '未知错误';
+            res.status(502).json(error(1001, `调用 verify-token 失败: ${message}`));
+            return;
+          }
+        }
       }
-      organizations = user.organizations ?? [];
-    } catch (err) {
-      if (axios.isAxiosError(err) && (err.response?.status === 401 || err.response?.status === 403)) {
-        res.status(401).json(error(1001, 'Token 无效或已过期'));
-        return;
-      }
-
-      const message = err instanceof Error ? err.message : '未知错误';
-      res.status(502).json(error(1001, `调用 verify-token 失败: ${message}`));
-      return;
     }
   }
 
   try {
+    const hasOrganizationNameColumn = await hasPluginOrganizationNameColumn();
     const organizationNames = Array.from(
       new Set(
         organizations
@@ -109,28 +118,65 @@ export async function list(req: Request, res: Response): Promise<void> {
           .filter((name) => name.length > 0)
       )
     );
+    const isRootUser = roles.includes('root');
+    let plugins: PluginRow[];
 
-    const [plugins] = organizationNames.length > 0
-      ? await pluginPool.query<PluginRow[]>(
-          `
-            SELECT *
-            FROM plugins
-            WHERE enabled = 1
-              AND (organization_name IS NULL OR organization_name IN (${organizationNames.map(() => '?').join(', ')}))
-            ORDER BY \`order\` ASC
-          `,
-          organizationNames
+    if (hasOrganizationNameColumn && isRootUser) {
+      [plugins] = await pluginPool.query<PluginRow[]>(
+        `
+          SELECT *
+          FROM plugins
+          WHERE enabled = 1
+          ORDER BY \`order\` ASC
+        `
+      );
+    } else if (hasOrganizationNameColumn && organizationNames.length > 0) {
+      [plugins] = await pluginPool.query<PluginRow[]>(
+        `
+          SELECT *
+          FROM plugins
+          WHERE enabled = 1
+            AND (organization_name IS NULL OR organization_name IN (${organizationNames.map(() => '?').join(', ')}))
+          ORDER BY \`order\` ASC
+        `,
+        organizationNames
+      );
+    } else if (hasOrganizationNameColumn) {
+      [plugins] = await pluginPool.query<PluginRow[]>(
+        `
+          SELECT *
+          FROM plugins
+          WHERE enabled = 1
+            AND organization_name IS NULL
+          ORDER BY \`order\` ASC
+        `
+      );
+    } else {
+      [plugins] = await pluginPool.query<PluginRow[]>(
+        `
+          SELECT *
+          FROM plugins
+          WHERE enabled = 1
+          ORDER BY \`order\` ASC
+        `
+      );
+    }
+
+    const organizationTitleMap = new Map(
+      organizations.map((organization) => [
+        organization.name,
+        organization.title || organization.name,
+      ])
+    );
+    const pluginOrganizationNames = hasOrganizationNameColumn
+      ? Array.from(
+          new Set(
+            plugins
+              .map((plugin) => plugin.organization_name?.trim() ?? '')
+              .filter((name) => name.length > 0)
+          )
         )
-      : await pluginPool.query<PluginRow[]>(
-          `
-            SELECT *
-            FROM plugins
-            WHERE enabled = 1
-              AND organization_name IS NULL
-            ORDER BY \`order\` ASC
-          `
-        );
-
+      : [];
     const menuGroups = [
       {
         id: 'org:public',
@@ -139,65 +185,43 @@ export async function list(req: Request, res: Response): Promise<void> {
         icon: 'Grid',
         order: 0,
       },
-      ...organizations.map((organization, index) => ({
-        id: `org:${organization.name}`,
-        name: organization.title || organization.name,
+      ...pluginOrganizationNames.map((name, index) => ({
+        id: `org:${name}`,
+        name: organizationTitleMap.get(name) ?? name,
         nameI18n: null,
         icon: 'OfficeBuilding',
         order: index + 1,
       })),
     ];
+    const serializedPlugins = plugins.map((plugin) => {
+      const organizationName = plugin.organization_name?.trim() ?? '';
 
-    res.json({
-      version: '1.0.0',
-      menuGroups,
-      plugins: plugins.map((plugin) => ({
+      return {
         id: plugin.id,
         name: plugin.name,
         nameI18n: decodeJsonField(plugin.name_i18n),
         description: plugin.description,
         url: plugin.url,
         icon: plugin.icon,
-        group: plugin.organization_name ? `org:${plugin.organization_name}` : 'org:public',
+        group: hasOrganizationNameColumn && organizationName
+          ? `org:${organizationName}`
+          : 'org:public',
         enabled: Boolean(plugin.enabled),
         order: Number(plugin.order),
         allowedOrigin: deriveOriginFromUrl(plugin.url) ?? plugin.allowed_origin,
         allowedHostOrigins: normalizeOriginList(plugin.allowed_host_origins).origins,
+        accessScope: normalizeAccessScope(plugin.access_scope),
         version: plugin.version,
-      })),
+      };
+    });
+
+    res.json({
+      version: '1.0.0',
+      menuGroups,
+      plugins: serializedPlugins,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : '未知错误';
     res.status(500).json(error(5000, `pluginDb query failed: ${message}`));
-  }
-}
-
-export async function verifyTokenProxy(req: Request, res: Response): Promise<void> {
-  try {
-    const response = await axios.get(`${MAIN_API_URL}/v1/plugin/verify-token`, {
-      headers: {
-        Authorization: req.headers.authorization || '',
-      },
-      timeout: MAIN_API_TIMEOUT_MS,
-    });
-
-    const refreshToken = response.headers['x-refresh-token'];
-    if (refreshToken) {
-      res.setHeader('x-refresh-token', refreshToken);
-    }
-
-    res.status(response.status).json(response.data);
-  } catch (err) {
-    if (axios.isAxiosError(err) && err.response) {
-      const refreshToken = err.response.headers['x-refresh-token'];
-      if (refreshToken) {
-        res.setHeader('x-refresh-token', refreshToken);
-      }
-      res.status(err.response.status).json(err.response.data);
-      return;
-    }
-
-    const message = err instanceof Error ? err.message : '未知错误';
-    res.status(502).json(error(1001, `调用 verify-token 失败: ${message}`));
   }
 }
