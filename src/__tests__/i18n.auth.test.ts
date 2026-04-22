@@ -8,14 +8,16 @@ import thTH from '../i18n/locales/th-TH'
 const locales = [zhCN, zhTW, enUS, jaJP, thTH]
 
 describe('auth locale keys', () => {
-  it('defines standalone auth and root-only copy in every locale pack', () => {
+  it('defines standalone auth plus root-only and manager-only copy in every locale pack', () => {
     for (const locale of locales) {
       expect(locale.auth.title).toBeTruthy()
       expect(locale.auth.login).toBeTruthy()
       expect(locale.auth.rootOnly).toBeTruthy()
+      expect(locale.auth.managerOnly).toBeTruthy()
       expect(locale.auth.loginFailed).toBeTruthy()
       expect(locale.layout.logout).toBeTruthy()
       expect(locale.layout.rootOnlyDenied).toBeTruthy()
+      expect(locale.layout.managerOnlyDenied).toBeTruthy()
       expect(locale.layout.sessionExpired).toBeTruthy()
     }
   })

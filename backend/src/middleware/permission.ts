@@ -2,6 +2,8 @@ import { NextFunction, Request, Response } from 'express';
 import { QueryRow, pluginPool } from '../db/pluginDb';
 import { AuthenticatedRequest } from './auth';
 
+const RESERVED_ROOT_ONLY_PLUGIN = 'system-admin';
+
 function normalizeActions(actionValue: unknown): string[] {
   if (typeof actionValue !== 'string' || actionValue.trim() === '') {
     return [];
@@ -44,6 +46,10 @@ export async function hasPermission(
     return true;
   }
 
+  if (pluginName.trim() === RESERVED_ROOT_ONLY_PLUGIN) {
+    return false;
+  }
+
   const rows = await getPermissionRows(roles, pluginName);
   return rows.some((row) => normalizeActions(row.action).includes(action));
 }
@@ -55,6 +61,10 @@ export async function getAllowedActions(roles: string[], pluginName: string): Pr
 
   if (roles.includes('root')) {
     return ['*'];
+  }
+
+  if (pluginName.trim() === RESERVED_ROOT_ONLY_PLUGIN) {
+    return [];
   }
 
   const rows = await getPermissionRows(roles, pluginName);

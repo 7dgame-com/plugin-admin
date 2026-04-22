@@ -43,6 +43,16 @@ describe('permission helpers', () => {
       'update-user',
     ]);
   });
+
+  it('never grants system-admin actions to non-root users', async () => {
+    pluginPool.query.mockResolvedValue([
+      [{ action: 'manage-permissions,manage-plugins,manage-organizations' }],
+    ]);
+
+    await expect(hasPermission(['admin'], 'system-admin', 'manage-plugins')).resolves.toBe(false);
+    await expect(getAllowedActions(['admin'], 'system-admin')).resolves.toEqual([]);
+    expect(pluginPool.query).not.toHaveBeenCalled();
+  });
 });
 
 describe('permission middleware', () => {

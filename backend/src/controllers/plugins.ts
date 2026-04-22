@@ -1,11 +1,17 @@
 import { Request, Response } from 'express';
 import { QueryRow, pluginPool } from '../db/pluginDb';
+import { hasPluginAccessScopeColumn, hasPluginOrganizationNameColumn } from '../db/pluginSchema';
 import {
   deriveOriginFromUrl,
   encodeJsonField,
   normalizeOriginList,
 } from '../utils/pluginData';
 import { error, paginated, success } from '../utils/response';
+
+const ACCESS_SCOPE_VALUES = ['auth-only', 'admin-only', 'manager-only', 'root-only'] as const;
+const DEFAULT_ACCESS_SCOPE = 'auth-only';
+
+type AccessScope = (typeof ACCESS_SCOPE_VALUES)[number];
 
 type PluginRow = QueryRow & {
   id: string;
@@ -19,6 +25,25 @@ type PluginRow = QueryRow & {
   allowed_origin: string | null;
   allowed_host_origins?: unknown;
   version: string | null;
+  access_scope?: string | null;
+  organization_name: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+type SerializedPluginRow = {
+  id: string;
+  name: string;
+  name_i18n: string | null;
+  description: string | null;
+  url: string;
+  icon: string | null;
+  enabled: number;
+  order: number;
+  allowed_origin: string | null;
+  allowed_host_origins: string[];
+  version: string | null;
+  access_scope: AccessScope;
   organization_name: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -37,6 +62,7 @@ type NormalizedPluginPayload = {
   allowed_host_origins: string[];
   allowed_host_origins_db: unknown;
   version: unknown;
+  access_scope: AccessScope;
   organization_name: unknown;
 };
 
@@ -81,6 +107,20 @@ function handleDuplicateError(res: Response, err: unknown): boolean {
   return true;
 }
 
+function normalizeAccessScope(value: unknown): AccessScope | null {
+  if (value === undefined || value === null || value === '') {
+    return DEFAULT_ACCESS_SCOPE;
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  return (ACCESS_SCOPE_VALUES as readonly string[]).includes(value)
+    ? (value as AccessScope)
+    : null;
+}
+
 function buildPluginPayload(
   body: Record<string, unknown>,
   allowedHostOrigins: string[]
@@ -100,15 +140,28 @@ function buildPluginPayload(
     allowed_host_origins: allowedHostOrigins,
     allowed_host_origins_db: encodeJsonField(allowedHostOrigins),
     version: body.version ?? null,
+    access_scope: normalizeAccessScope(body.access_scope) ?? DEFAULT_ACCESS_SCOPE,
     organization_name: body.organization_name ?? null,
   };
 }
 
-function serializePluginRow(row: PluginRow): PluginRow & { allowed_host_origins: string[] } {
+function serializePluginRow(row: PluginRow): SerializedPluginRow {
   return {
-    ...row,
+    id: row.id,
+    name: row.name,
+    name_i18n: row.name_i18n,
+    description: row.description,
+    url: row.url,
+    icon: row.icon,
+    enabled: row.enabled,
+    order: row.order,
     allowed_origin: deriveOriginFromUrl(row.url) ?? row.allowed_origin,
     allowed_host_origins: normalizeOriginList(row.allowed_host_origins).origins,
+    version: row.version,
+    access_scope: normalizeAccessScope(row.access_scope) ?? DEFAULT_ACCESS_SCOPE,
+    organization_name: row.organization_name ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
   };
 }
 
@@ -119,16 +172,16 @@ export async function listPlugins(req: Request, res: Response): Promise<void> {
   const page = asPositiveInt(req.query.page, 1);
   const perPage = asPositiveInt(req.query.per_page, 20);
 
-  const filters: string[] = [];
-  const params: unknown[] = [];
-  if (organizationName !== '') {
-    filters.push('organization_name = ?');
-    params.push(organizationName);
-  }
-
-  const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
-
   try {
+    const hasOrganizationNameColumn = await hasPluginOrganizationNameColumn();
+    const filters: string[] = [];
+    const params: unknown[] = [];
+    if (hasOrganizationNameColumn && organizationName !== '') {
+      filters.push('organization_name = ?');
+      params.push(organizationName);
+    }
+
+    const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
     const [countRows] = await pluginPool.query<QueryRow[]>(
       `SELECT COUNT(*) AS total FROM plugins ${whereClause}`,
       params
@@ -178,6 +231,14 @@ export async function createPlugin(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  const accessScope = normalizeAccessScope(req.body?.access_scope);
+  if (accessScope === null) {
+    res.status(400).json(
+      error(4001, 'access_scope 必须是 auth-only、admin-only、manager-only 或 root-only')
+    );
+    return;
+  }
+
   const { origins: allowedHostOrigins, invalidEntries } = normalizeOriginList(
     req.body?.allowed_host_origins
   );
@@ -194,26 +255,52 @@ export async function createPlugin(req: Request, res: Response): Promise<void> {
   );
 
   try {
+    const hasOrganizationNameColumn = await hasPluginOrganizationNameColumn();
+    const hasAccessScopeColumn = await hasPluginAccessScopeColumn();
+    const columns = [
+      'id',
+      'name',
+      'url',
+      'name_i18n',
+      'description',
+      'icon',
+      'enabled',
+      '`order`',
+      'allowed_origin',
+      'allowed_host_origins',
+      'version',
+    ];
+    const values: unknown[] = [
+      payload.id,
+      payload.name,
+      payload.url,
+      payload.name_i18n,
+      payload.description,
+      payload.icon,
+      payload.enabled,
+      payload.order,
+      payload.allowed_origin,
+      payload.allowed_host_origins_db,
+      payload.version,
+    ];
+
+    if (hasAccessScopeColumn) {
+      columns.push('access_scope');
+      values.push(payload.access_scope);
+    }
+
+    if (hasOrganizationNameColumn) {
+      columns.push('organization_name');
+      values.push(payload.organization_name);
+    }
+
     await pluginPool.query(
       `
         INSERT INTO plugins
-          (id, name, url, name_i18n, description, icon, enabled, \`order\`, allowed_origin, allowed_host_origins, version, organization_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (${columns.join(', ')})
+        VALUES (${columns.map(() => '?').join(', ')})
       `,
-      [
-        payload.id,
-        payload.name,
-        payload.url,
-        payload.name_i18n,
-        payload.description,
-        payload.icon,
-        payload.enabled,
-        payload.order,
-        payload.allowed_origin,
-        payload.allowed_host_origins_db,
-        payload.version,
-        payload.organization_name,
-      ]
+      values
     );
 
     res.json(
@@ -229,7 +316,8 @@ export async function createPlugin(req: Request, res: Response): Promise<void> {
         allowed_origin: payload.allowed_origin,
         allowed_host_origins: payload.allowed_host_origins,
         version: payload.version,
-        organization_name: payload.organization_name,
+        access_scope: hasAccessScopeColumn ? payload.access_scope : DEFAULT_ACCESS_SCOPE,
+        organization_name: hasOrganizationNameColumn ? payload.organization_name : null,
       })
     );
   } catch (err) {
@@ -251,6 +339,8 @@ export async function updatePlugin(req: Request, res: Response): Promise<void> {
   }
 
   try {
+    const hasOrganizationNameColumn = await hasPluginOrganizationNameColumn();
+    const hasAccessScopeColumn = await hasPluginAccessScopeColumn();
     const [existingRows] = await pluginPool.query<PluginRow[]>(
       `
         SELECT *
@@ -274,14 +364,16 @@ export async function updatePlugin(req: Request, res: Response): Promise<void> {
       'enabled',
       'order',
       'version',
-      'organization_name',
     ] as const;
+    const mutableFields = hasOrganizationNameColumn
+      ? [...fieldNames, 'organization_name'] as const
+      : fieldNames;
 
     const updates: string[] = [];
     const params: unknown[] = [];
     const responseData: Record<string, unknown> = { id };
 
-    for (const field of fieldNames) {
+    for (const field of mutableFields) {
       if (req.body?.[field] === undefined) {
         continue;
       }
@@ -310,6 +402,28 @@ export async function updatePlugin(req: Request, res: Response): Promise<void> {
       updates.push(`\`${field}\` = ?`);
       params.push(value);
       responseData[field] = value;
+    }
+
+    if (!hasOrganizationNameColumn && req.body?.organization_name !== undefined) {
+      responseData.organization_name = null;
+    }
+
+    if (req.body?.access_scope !== undefined) {
+      const accessScope = normalizeAccessScope(req.body.access_scope);
+      if (accessScope === null) {
+        res.status(400).json(
+          error(4001, 'access_scope 必须是 auth-only、admin-only、manager-only 或 root-only')
+        );
+        return;
+      }
+
+      if (hasAccessScopeColumn) {
+        updates.push('`access_scope` = ?');
+        params.push(accessScope);
+      }
+      responseData.access_scope = hasAccessScopeColumn
+        ? accessScope
+        : DEFAULT_ACCESS_SCOPE;
     }
 
     if (req.body?.allowed_host_origins !== undefined) {

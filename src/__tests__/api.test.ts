@@ -34,6 +34,24 @@ describe('Property 1: API baseURL 包含 /backend/api 前缀', () => {
     const { mainApi } = await import('../api/index')
     expect(mainApi.defaults.baseURL).toBe('/api/v1')
   })
+
+  it('verifyToken uses mainApi /plugin/verify-token instead of pluginApi', async () => {
+    const { verifyToken, mainApi } = await import('../api/index')
+    const getSpy = vi.spyOn(mainApi, 'get').mockResolvedValue({
+      data: {
+        code: 0,
+        data: {
+          id: 1,
+          username: 'root',
+          roles: ['root'],
+        },
+      },
+    } as never)
+
+    await verifyToken()
+
+    expect(getSpy).toHaveBeenCalledWith('/plugin/verify-token')
+  })
 })
 
 // Feature: system-admin-plugin-upgrade, Property 5: x-refresh-token 响应头自动持久化
@@ -127,6 +145,39 @@ describe('Property 6: 两段式 token 刷新顺序', () => {
         }
       })
     )
+  })
+
+  it('waits for the parent token before sending the first embedded request', async () => {
+    mockIsInIframe.mockReturnValue(true)
+    mockRequestParentTokenRefresh.mockResolvedValue({ accessToken: 'parent-token' })
+
+    const { default: adminApi } = await import('../api/index')
+
+    let callCount = 0
+    const originalAdapter = adminApi.defaults.adapter
+    adminApi.defaults.adapter = async (config: import('axios').InternalAxiosRequestConfig) => {
+      callCount += 1
+      expect(config.headers.Authorization).toBe('Bearer parent-token')
+
+      return {
+        status: 200,
+        statusText: 'OK',
+        data: { ok: true },
+        headers: {},
+        config,
+      }
+    }
+
+    try {
+      const response = await adminApi.get('/test')
+
+      expect(response.data).toEqual({ ok: true })
+      expect(callCount).toBe(1)
+      expect(mockRequestParentTokenRefresh).toHaveBeenCalledTimes(1)
+      expect(localStorage.getItem('system-admin-token')).toBe('parent-token')
+    } finally {
+      adminApi.defaults.adapter = originalAdapter
+    }
   })
 
   it('uses /api/v1/auth/refresh in standalone mode and retries with the new bearer token', async () => {

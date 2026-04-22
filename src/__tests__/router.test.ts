@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mockError = vi.fn()
 const mockGetToken = vi.fn()
 const mockGetRuntimeMode = vi.fn()
-const mockFetchPermissions = vi.fn()
-const mockCan = vi.fn<(permission: string) => boolean>()
-const permissionState = {
+const mockFetchSession = vi.fn()
+const authState = {
   loaded: { value: true },
   loading: { value: false },
+  isRootUser: { value: true },
+  isManagerUser: { value: false },
+  hasManagerAccess: { value: true },
 }
 
 vi.mock('element-plus', () => ({
@@ -21,13 +23,14 @@ vi.mock('../utils/token', () => ({
   getRuntimeMode: () => mockGetRuntimeMode(),
 }))
 
-vi.mock('../composables/usePermissions', () => ({
-  usePermissions: () => ({
-    loaded: permissionState.loaded,
-    loading: permissionState.loading,
-    fetchPermissions: mockFetchPermissions,
-    can: (permission: string) => mockCan(permission),
-    hasAny: () => true,
+vi.mock('../composables/useAuthSession', () => ({
+  useAuthSession: () => ({
+    loaded: authState.loaded,
+    loading: authState.loading,
+    isRootUser: authState.isRootUser,
+    isManagerUser: authState.isManagerUser,
+    hasManagerAccess: authState.hasManagerAccess,
+    fetchSession: mockFetchSession,
   }),
 }))
 
@@ -46,13 +49,14 @@ describe('router auth guards', () => {
     mockError.mockReset()
     mockGetToken.mockReset()
     mockGetRuntimeMode.mockReset()
-    mockFetchPermissions.mockReset()
-    mockCan.mockReset()
+    mockFetchSession.mockReset()
     mockGetToken.mockReturnValue('token')
     mockGetRuntimeMode.mockReturnValue('standalone')
-    permissionState.loaded.value = true
-    permissionState.loading.value = false
-    mockCan.mockReturnValue(true)
+    authState.loaded.value = true
+    authState.loading.value = false
+    authState.isRootUser.value = true
+    authState.isManagerUser.value = false
+    authState.hasManagerAccess.value = true
     await router.push('/api-diagnostics')
     await router.isReady()
   })
@@ -80,18 +84,18 @@ describe('router auth guards', () => {
     expect(router.currentRoute.value.path).toBe('/permissions')
   })
 
-  it('waits for permissions to load before allowing the first standalone redirect after login', async () => {
-    permissionState.loaded.value = false
-    mockCan.mockReturnValue(false)
-    mockFetchPermissions.mockImplementation(async () => {
-      permissionState.loaded.value = true
-      mockCan.mockReturnValue(true)
+  it('waits for the auth session before allowing a root-only route', async () => {
+    authState.loaded.value = false
+    authState.isRootUser.value = false
+    mockFetchSession.mockImplementation(async () => {
+      authState.loaded.value = true
+      authState.isRootUser.value = true
     })
 
     await router.push('/login')
     await router.push('/permissions')
 
-    expect(mockFetchPermissions).toHaveBeenCalledTimes(1)
+    expect(mockFetchSession).toHaveBeenCalledTimes(1)
     expect(router.currentRoute.value.name).toBe('PermissionList')
   })
 })
@@ -99,11 +103,13 @@ describe('router auth guards', () => {
 describe('router organization migration', () => {
   beforeEach(() => {
     mockError.mockReset()
-    mockCan.mockReset()
     mockGetToken.mockReturnValue('token')
     mockGetRuntimeMode.mockReturnValue('standalone')
-    permissionState.loaded.value = true
-    mockFetchPermissions.mockReset()
+    authState.loaded.value = true
+    authState.isRootUser.value = true
+    authState.isManagerUser.value = false
+    authState.hasManagerAccess.value = true
+    mockFetchSession.mockReset()
   })
 
   it('registers the organization management route and removes the legacy menu-group route', () => {
@@ -113,33 +119,61 @@ describe('router organization migration', () => {
     expect(routePaths).not.toContain('/menu-groups')
   })
 
-  it('protects the organization route with manage-organizations', async () => {
-    mockCan.mockReturnValue(false)
+  it('protects the organization route with root-only access', async () => {
+    authState.isRootUser.value = false
 
     const { permissionGuard } = await import('../router/index')
     const result = await permissionGuard(
-      { meta: { requiresPermission: 'manage-organizations' }, fullPath: '/organizations' },
+      { meta: { requiresRoot: true }, fullPath: '/organizations' },
       { name: 'PluginList' },
     )
 
-    expect(mockCan).toHaveBeenCalledWith('manage-organizations')
-    expect(mockError).toHaveBeenCalledTimes(1)
-    expect(result).toBe(false)
+    expect(mockFetchSession).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ name: 'NotAllowed', query: { reason: 'root' } })
   })
 
-  it('allows first-load navigation even before the permission payload finishes hydrating', async () => {
-    permissionState.loaded.value = false
-    mockCan.mockReturnValue(false)
-    mockFetchPermissions.mockResolvedValue(undefined)
+  it('redirects first-load navigation to the root-only denied page when the user is not root', async () => {
+    authState.loaded.value = false
+    authState.isRootUser.value = false
+    mockFetchSession.mockResolvedValue(undefined)
 
     const { permissionGuard } = await import('../router/index')
     const result = await permissionGuard(
-      { meta: { requiresPermission: 'manage-organizations' }, fullPath: '/organizations' },
+      { meta: { requiresRoot: true }, fullPath: '/organizations' },
       { name: undefined },
     )
 
-    expect(mockFetchPermissions).toHaveBeenCalledTimes(1)
+    expect(mockFetchSession).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ name: 'NotAllowed', query: { reason: 'root' } })
+  })
+
+  it('allows manager-only routes for manager users', async () => {
+    authState.isRootUser.value = false
+    authState.isManagerUser.value = true
+    authState.hasManagerAccess.value = true
+
+    const { permissionGuard } = await import('../router/index')
+    const result = await permissionGuard(
+      { meta: { requiresManager: true }, fullPath: '/future-manager-page' },
+      { name: 'PluginList' },
+    )
+
+    expect(mockFetchSession).toHaveBeenCalledTimes(1)
     expect(result).toBe(true)
-    expect(mockError).not.toHaveBeenCalled()
+  })
+
+  it('redirects manager-only routes when the user lacks manager access', async () => {
+    authState.isRootUser.value = false
+    authState.isManagerUser.value = false
+    authState.hasManagerAccess.value = false
+
+    const { permissionGuard } = await import('../router/index')
+    const result = await permissionGuard(
+      { meta: { requiresManager: true }, fullPath: '/future-manager-page' },
+      { name: 'PluginList' },
+    )
+
+    expect(mockFetchSession).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ name: 'NotAllowed', query: { reason: 'manager' } })
   })
 })

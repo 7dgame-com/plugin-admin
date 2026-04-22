@@ -9,6 +9,7 @@ jest.mock('axios');
 
 import axios from 'axios';
 import request from 'supertest';
+import { resetPluginSchemaCacheForTests } from '../db/pluginSchema';
 import { createApp } from '../index';
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -17,11 +18,14 @@ const { pluginPool } = jest.requireMock('../db/pluginDb') as {
     query: jest.Mock;
   };
 };
+const originalHasOrganizationNameColumn = process.env.PLUGIN_DB_HAS_ORGANIZATION_NAME_COLUMN;
 
 describe('plugin-admin routes', () => {
   beforeEach(() => {
     mockedAxios.get.mockReset();
     pluginPool.query.mockReset();
+    resetPluginSchemaCacheForTests();
+    delete process.env.PLUGIN_DB_HAS_ORGANIZATION_NAME_COLUMN;
     mockedAxios.get.mockResolvedValue({
       data: {
         code: 0,
@@ -33,6 +37,16 @@ describe('plugin-admin routes', () => {
         },
       },
     } as never);
+  });
+
+  afterAll(() => {
+    resetPluginSchemaCacheForTests();
+    if (originalHasOrganizationNameColumn === undefined) {
+      delete process.env.PLUGIN_DB_HAS_ORGANIZATION_NAME_COLUMN;
+      return;
+    }
+
+    process.env.PLUGIN_DB_HAS_ORGANIZATION_NAME_COLUMN = originalHasOrganizationNameColumn;
   });
 
   it('returns paginated permission records', async () => {
@@ -100,6 +114,26 @@ describe('plugin-admin routes', () => {
     expect(pluginPool.query).not.toHaveBeenCalled();
   });
 
+  it('rejects reserved system-admin permission rules before hitting the database', async () => {
+    const app = createApp();
+
+    const response = await request(app)
+      .post('/api/v1/plugin-admin/create-permission')
+      .set('Authorization', 'Bearer token')
+      .send({
+        role_or_permission: 'admin',
+        plugin_name: 'system-admin',
+        action: 'manage-plugins',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      code: 4001,
+      message: 'system-admin 已改为仅按 root 登录态控制，不再支持插件权限配置',
+    });
+    expect(pluginPool.query).not.toHaveBeenCalled();
+  });
+
   it('validates plugin URLs during creation', async () => {
     const app = createApp();
 
@@ -130,6 +164,7 @@ describe('plugin-admin routes', () => {
         id: 'demo-plugin',
         name: 'Demo Plugin',
         url: 'https://plugin.example.com/app/index.html',
+        access_scope: 'manager-only',
         allowed_host_origins: [
           'https://main-a.example.com/admin',
           'https://main-b.example.com',
@@ -142,6 +177,7 @@ describe('plugin-admin routes', () => {
       expect.stringContaining('allowed_host_origins'),
       expect.arrayContaining([
         'https://plugin.example.com',
+        'manager-only',
         JSON.stringify([
           'https://main-a.example.com',
           'https://main-b.example.com',
@@ -151,6 +187,7 @@ describe('plugin-admin routes', () => {
     expect(response.body.data).toMatchObject({
       id: 'demo-plugin',
       allowed_origin: 'https://plugin.example.com',
+      access_scope: 'manager-only',
       allowed_host_origins: [
         'https://main-a.example.com',
         'https://main-b.example.com',
@@ -174,10 +211,13 @@ describe('plugin-admin routes', () => {
             icon: 'Setting',
             enabled: 1,
             order: 1,
+            group_id: 'admin',
             allowed_origin: 'https://system-admin.plugins.xrugc.com',
             allowed_host_origins:
               '["https://main-a.xrugc.com","https://main-b.xrugc.com"]',
             version: '1.0.0',
+            access_scope: 'root-only',
+            domain: null,
             organization_name: null,
           },
         ],
@@ -192,6 +232,7 @@ describe('plugin-admin routes', () => {
       id: 'system-admin',
       organization_name: null,
       allowed_origin: 'https://system-admin.plugins.xrugc.com',
+      access_scope: 'root-only',
       allowed_host_origins: [
         'https://main-a.xrugc.com',
         'https://main-b.xrugc.com',
@@ -199,6 +240,92 @@ describe('plugin-admin routes', () => {
     });
     expect(response.body.data.items[0].domain).toBeUndefined();
     expect(response.body.data.items[0].group_id).toBeUndefined();
+  });
+
+  it('skips organization_name writes when the plugins table is still on the legacy schema during creation', async () => {
+    process.env.PLUGIN_DB_HAS_ORGANIZATION_NAME_COLUMN = 'false';
+    resetPluginSchemaCacheForTests();
+
+    const app = createApp();
+
+    const response = await request(app)
+      .post('/api/v1/plugin-admin/create-plugin')
+      .set('Authorization', 'Bearer token')
+      .send({
+        id: 'demo-plugin',
+        name: 'Demo Plugin',
+        url: 'https://plugin.example.com/app/index.html',
+        organization_name: 'acme',
+      });
+
+    expect(response.status).toBe(200);
+    expect(pluginPool.query).toHaveBeenCalledTimes(1);
+    const [sql, params] = pluginPool.query.mock.calls[0] as [string, unknown[]];
+    expect(sql).not.toContain('organization_name');
+    expect(params).toHaveLength(12);
+    expect(response.body.data.organization_name).toBeNull();
+  });
+
+  it('rejects invalid access_scope values during creation', async () => {
+    const app = createApp();
+
+    const response = await request(app)
+      .post('/api/v1/plugin-admin/create-plugin')
+      .set('Authorization', 'Bearer token')
+      .send({
+        id: 'demo-plugin',
+        name: 'Demo Plugin',
+        url: 'https://plugin.example.com/app/index.html',
+        access_scope: 'staff-only',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      code: 4001,
+      message: 'access_scope 必须是 auth-only、admin-only、manager-only 或 root-only',
+    });
+    expect(pluginPool.query).not.toHaveBeenCalled();
+  });
+
+  it('skips organization_name writes when the plugins table is still on the legacy schema during update', async () => {
+    process.env.PLUGIN_DB_HAS_ORGANIZATION_NAME_COLUMN = 'false';
+    resetPluginSchemaCacheForTests();
+
+    const app = createApp();
+
+    pluginPool.query
+      .mockResolvedValueOnce([
+        [
+          {
+            id: 'demo-plugin',
+            name: 'Demo Plugin',
+            url: 'https://old.example.com/app',
+          },
+        ],
+      ])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    const response = await request(app)
+      .put('/api/v1/plugin-admin/update-plugin')
+      .set('Authorization', 'Bearer token')
+      .send({
+        id: 'demo-plugin',
+        name: 'Demo Plugin',
+        url: 'https://new.example.com/app/index.html',
+        organization_name: 'acme',
+      });
+
+    expect(response.status).toBe(200);
+    expect(pluginPool.query).toHaveBeenCalledTimes(2);
+    const [sql, params] = pluginPool.query.mock.calls[1] as [string, unknown[]];
+    expect(sql).not.toContain('organization_name');
+    expect(params).toEqual([
+      'Demo Plugin',
+      'https://new.example.com/app/index.html',
+      'https://new.example.com',
+      'demo-plugin',
+    ]);
+    expect(response.body.data.organization_name).toBeNull();
   });
 
   it('does not mount legacy menu-group routes anymore', async () => {
