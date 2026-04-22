@@ -1,7 +1,7 @@
 export default {
   pluginMeta: {
     name: 'ผู้ดูแลระบบ',
-    description: 'เครื่องมือสิทธิ์ปลั๊กอิน การลงทะเบียน และภาพรวมองค์กรแบบอ่านอย่างเดียว',
+    description: 'เครื่องมือลงทะเบียนปลั๊กอินและภาพรวมองค์กรแบบอ่านอย่างเดียว',
     groupName: 'ระบบ',
   },
   common: {
@@ -53,28 +53,6 @@ export default {
     rootOnlyDenied: 'เฉพาะผู้ใช้ root เท่านั้นที่เข้า system-admin ได้',
     managerOnlyDenied: 'เฉพาะผู้ใช้ manager หรือ root เท่านั้นที่เข้าหน้านี้ได้',
     sessionExpired: 'เซสชันหมดอายุแล้ว กรุณาเข้าสู่ระบบใหม่',
-  },
-  permission: {
-    title: 'จัดการสิทธิ์ปลั๊กอิน',
-    addTitle: 'เพิ่มการตั้งค่าสิทธิ์',
-    editTitle: 'แก้ไขการตั้งค่าสิทธิ์',
-    roleOrPermission: 'บทบาท / สิทธิ์',
-    roleOrPermissionLabel: 'ชื่อบทบาท / สิทธิ์',
-    pluginName: 'รหัสปลั๊กอิน',
-    action: 'การกระทำ',
-    searchRolePlaceholder: 'ค้นหาบทบาทหรือสิทธิ์',
-    searchPluginPlaceholder: 'ค้นหาปลั๊กอิน',
-    searchActionPlaceholder: 'ค้นหาการกระทำ',
-    rolePlaceholder: 'เช่น root, admin',
-    pluginPlaceholder: 'เช่น user-management',
-    actionPlaceholder: 'เช่น manage-permissions',
-    deleteConfirm: 'ลบการตั้งค่าสิทธิ์ "{role} / {plugin} / {action}" หรือไม่?',
-    messages: {
-      loadFailed: 'โหลดการตั้งค่าสิทธิ์ไม่สำเร็จ',
-      roleRequired: 'กรุณากรอกชื่อบทบาท / สิทธิ์',
-      pluginRequired: 'กรุณากรอกรหัสปลั๊กอิน',
-      actionRequired: 'กรุณากรอกการกระทำ',
-    },
   },
   plugin: {
     title: 'ทะเบียนปลั๊กอิน',

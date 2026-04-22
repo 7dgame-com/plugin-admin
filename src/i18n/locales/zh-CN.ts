@@ -1,7 +1,7 @@
 export default {
   pluginMeta: {
     name: '系统管理',
-    description: '插件权限、注册与组织只读总览工具',
+    description: '插件注册与组织只读总览工具',
     groupName: '系统',
   },
   common: {
@@ -53,28 +53,6 @@ export default {
     rootOnlyDenied: '仅 root 可访问 system-admin',
     managerOnlyDenied: '仅 manager 或 root 可访问此页面',
     sessionExpired: '登录已失效，请重新登录',
-  },
-  permission: {
-    title: '插件权限管理',
-    addTitle: '新增权限配置',
-    editTitle: '编辑权限配置',
-    roleOrPermission: '角色/权限',
-    roleOrPermissionLabel: '角色/权限名',
-    pluginName: '插件标识',
-    action: '操作',
-    searchRolePlaceholder: '搜索角色或权限',
-    searchPluginPlaceholder: '搜索插件',
-    searchActionPlaceholder: '搜索操作',
-    rolePlaceholder: '如: root, admin',
-    pluginPlaceholder: '如: user-management',
-    actionPlaceholder: '如: manage-permissions',
-    deleteConfirm: '确定删除权限配置 "{role} / {plugin} / {action}"？',
-    messages: {
-      loadFailed: '加载权限配置失败',
-      roleRequired: '请输入角色/权限名',
-      pluginRequired: '请输入插件标识',
-      actionRequired: '请输入操作',
-    },
   },
   plugin: {
     title: '插件注册管理',

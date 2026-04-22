@@ -1,7 +1,7 @@
 export default {
   pluginMeta: {
     name: 'System Admin',
-    description: 'Plugin permissions, registry, and read-only organization overview',
+    description: 'Plugin registry and read-only organization overview',
     groupName: 'System',
   },
   common: {
@@ -53,28 +53,6 @@ export default {
     rootOnlyDenied: 'Only root users can access system-admin',
     managerOnlyDenied: 'Only manager or root users can access this page',
     sessionExpired: 'Your session expired. Please sign in again.',
-  },
-  permission: {
-    title: 'Plugin Permission Management',
-    addTitle: 'Add Permission Config',
-    editTitle: 'Edit Permission Config',
-    roleOrPermission: 'Role / Permission',
-    roleOrPermissionLabel: 'Role / Permission Name',
-    pluginName: 'Plugin ID',
-    action: 'Action',
-    searchRolePlaceholder: 'Search role or permission',
-    searchPluginPlaceholder: 'Search plugin',
-    searchActionPlaceholder: 'Search action',
-    rolePlaceholder: 'e.g. root, admin',
-    pluginPlaceholder: 'e.g. user-management',
-    actionPlaceholder: 'e.g. manage-permissions',
-    deleteConfirm: 'Delete permission config "{role} / {plugin} / {action}"?',
-    messages: {
-      loadFailed: 'Failed to load permission configs',
-      roleRequired: 'Please enter role / permission name',
-      pluginRequired: 'Please enter plugin ID',
-      actionRequired: 'Please enter action',
-    },
   },
   plugin: {
     title: 'Plugin Registry',

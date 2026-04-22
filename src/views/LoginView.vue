@@ -104,7 +104,7 @@ async function submit() {
 
     const redirect = typeof route.query.redirect === 'string'
       ? route.query.redirect
-      : '/permissions'
+      : '/plugins'
 
     await router.replace(redirect)
   } catch (error) {

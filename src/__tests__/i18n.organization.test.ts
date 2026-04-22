@@ -9,27 +9,27 @@ const locales = [
   {
     name: 'zh-CN',
     locale: zhCN,
-    description: '插件权限、注册与组织只读总览工具',
+    description: '插件注册与组织只读总览工具',
   },
   {
     name: 'zh-TW',
     locale: zhTW,
-    description: '外掛權限、註冊與組織唯讀總覽工具',
+    description: '外掛註冊與組織唯讀總覽工具',
   },
   {
     name: 'en-US',
     locale: enUS,
-    description: 'Plugin permissions, registry, and read-only organization overview',
+    description: 'Plugin registry and read-only organization overview',
   },
   {
     name: 'ja-JP',
     locale: jaJP,
-    description: 'プラグイン権限、登録、組織の閲覧専用一覧ツール',
+    description: 'プラグイン登録と組織の閲覧専用一覧ツール',
   },
   {
     name: 'th-TH',
     locale: thTH,
-    description: 'เครื่องมือสิทธิ์ปลั๊กอิน การลงทะเบียน และภาพรวมองค์กรแบบอ่านอย่างเดียว',
+    description: 'เครื่องมือลงทะเบียนปลั๊กอินและภาพรวมองค์กรแบบอ่านอย่างเดียว',
   },
 ]
 
@@ -42,6 +42,7 @@ describe('organization readonly locale keys', () => {
       expect(locale.organization.organizationName, `${name} organization.organizationName`).toBeTruthy()
       expect(locale.organization.readonlyHint, `${name} organization.readonlyHint`).toBeTruthy()
       expect(locale.organization.messages.loadFailed, `${name} organization.messages.loadFailed`).toBeTruthy()
+      expect('permission' in locale, `${name} permission namespace`).toBe(false)
     }
   })
 })

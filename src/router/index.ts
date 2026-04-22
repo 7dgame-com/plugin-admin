@@ -35,14 +35,8 @@ const router = createRouter({
     {
       path: '/',
       component: () => import('../layout/AppLayout.vue'),
-      redirect: '/permissions',
+      redirect: '/plugins',
       children: [
-        {
-          path: 'permissions',
-          name: 'PermissionList',
-          component: () => import('../views/PermissionList.vue'),
-          meta: { title: '插件权限管理', requiresRoot: true }
-        },
         {
           path: 'plugins',
           name: 'PluginList',
