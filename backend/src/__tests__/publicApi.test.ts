@@ -439,6 +439,71 @@ describe('public API routes', () => {
     });
   });
 
+  it('uses organization titles from the main organization list for root-visible plugin groups', async () => {
+    const app = createApp();
+
+    mockedAxios.get
+      .mockResolvedValueOnce({
+        data: {
+          code: 0,
+          message: 'ok',
+          data: {
+            id: 1,
+            username: 'root',
+            roles: ['root'],
+            organizations: [],
+          },
+        },
+      } as never)
+      .mockResolvedValueOnce({
+        data: {
+          code: 0,
+          message: 'ok',
+          data: [
+            { id: 8, name: 'msc', title: '澳門科學館' },
+          ],
+        },
+      } as never);
+
+    pluginPool.query.mockResolvedValueOnce([
+      [
+        {
+          id: 'ai-3d-generator-v3',
+          name: 'AI 3D 生成器 V3',
+          name_i18n: null,
+          description: 'generator',
+          url: 'https://a23.plugins.xrugc.com/',
+          icon: 'MagicStick',
+          enabled: 1,
+          order: 1,
+          allowed_origin: null,
+          allowed_host_origins: null,
+          version: '1.0.0',
+          access_scope: 'manager-only',
+          organization_name: 'msc',
+        },
+      ],
+    ]);
+
+    const response = await request(app)
+      .get('/api/v1/plugin/list')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(mockedAxios.get).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('/v1/organization/list'),
+      expect.any(Object)
+    );
+    expect(response.body.menuGroups).toContainEqual({
+      id: 'org:msc',
+      name: '澳門科學館',
+      nameI18n: null,
+      icon: 'OfficeBuilding',
+      order: 1,
+    });
+  });
+
   it('falls back to the legacy public-only plugin query when organization_name is unavailable', async () => {
     process.env.PLUGIN_DB_HAS_ORGANIZATION_NAME_COLUMN = 'false';
     resetPluginSchemaCacheForTests();
