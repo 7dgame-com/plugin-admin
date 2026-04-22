@@ -54,7 +54,7 @@ describe('AppLayout', () => {
     const wrapper = mount(AppLayout, {
       global: {
         mocks: {
-          $route: { path: '/permissions', meta: { title: 'Permissions' } },
+          $route: { path: '/plugins', meta: { title: 'Plugins' } },
         },
         stubs: {
           RouterLink: { template: '<a><slot /></a>' },
@@ -79,5 +79,37 @@ describe('AppLayout', () => {
     expect(removeAllTokens).toHaveBeenCalled()
     expect(fetchSession).toHaveBeenCalledTimes(1)
     expect(replace).toHaveBeenCalledWith({ name: 'Login' })
+  })
+
+  it('does not render a permission configuration navigation item', async () => {
+    fetchSession.mockResolvedValue(undefined)
+
+    const wrapper = mount(AppLayout, {
+      global: {
+        mocks: {
+          $route: { path: '/plugins', meta: { title: 'Plugins' } },
+        },
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+          RouterView: { template: '<div />' },
+          ElIcon: { template: '<i><slot /></i>' },
+          ElTag: { template: '<span><slot /></span>' },
+          ElEmpty: { template: '<div />' },
+          Close: true,
+          Fold: true,
+          Key: true,
+          Grid: true,
+          OfficeBuilding: true,
+          User: true,
+          Loading: true,
+        },
+      },
+    })
+
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('permission.title')
+    expect(wrapper.text()).toContain('plugin.title')
+    expect(wrapper.text()).toContain('organization.title')
   })
 })

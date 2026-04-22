@@ -257,7 +257,7 @@
     <div class="section">
       <h3>自定义 URL 测试</h3>
       <div class="custom-test">
-        <el-input v-model="customUrl" placeholder="输入完整或相对 URL，如 /backend/api/v1/plugin-admin/permissions" style="flex:1" />
+        <el-input v-model="customUrl" placeholder="输入完整或相对 URL，如 /backend/api/v1/plugin-admin/plugins" style="flex:1" />
         <el-select v-model="customMethod" style="width: 120px">
           <el-option label="GET" value="GET" />
           <el-option label="POST" value="POST" />
@@ -400,7 +400,6 @@ function makeTest(
 }
 
 const tests = ref<TestItem[]>([
-  makeTest('获取权限配置列表', 'GET', 'adminApi', '/permissions', { page: '1', per_page: '10' }),
   makeTest('获取插件列表', 'GET', 'adminApi', '/plugins', { page: '1', per_page: '10' }),
   makeTest('获取组织列表', 'GET', 'mainApi', '/organization/list'),
   makeTest('验证 Token', 'GET', 'mainApi', '/plugin/verify-token'),
@@ -461,7 +460,7 @@ interface RawTestItem {
 }
 
 const rawTests = ref<RawTestItem[]>([
-  { name: 'adminApi /permissions', url: '/backend/api/v1/plugin-admin/permissions?page=1&per_page=5', status: 'pending', httpStatus: '', responseBody: '', errorMessage: '' },
+  { name: 'adminApi /plugins', url: '/backend/api/v1/plugin-admin/plugins?page=1&per_page=5', status: 'pending', httpStatus: '', responseBody: '', errorMessage: '' },
   { name: 'mainApi /plugin/verify-token', url: '/api/v1/plugin/verify-token', status: 'pending', httpStatus: '', responseBody: '', errorMessage: '' },
   { name: 'Health Check', url: '/health', status: 'pending', httpStatus: '', responseBody: '', errorMessage: '' },
   { name: 'Debug Env', url: '/debug-env', status: 'pending', httpStatus: '', responseBody: '', errorMessage: '' },
@@ -533,7 +532,7 @@ interface ProxyTestItem {
 }
 
 const proxyTests = ref<ProxyTestItem[]>([
-  { name: '/backend/ → adminApi', url: '/backend/api/v1/plugin-admin/permissions?page=1&per_page=1', expectedBackend: 'proxy_pass → system-admin 后端', status: 'pending', httpStatus: '', responseHeaders: '', responseBody: '', latency: null, verdict: 'ok', verdictIcon: '', verdictText: '' },
+  { name: '/backend/ → adminApi', url: '/backend/api/v1/plugin-admin/plugins?page=1&per_page=1', expectedBackend: 'proxy_pass → system-admin 后端', status: 'pending', httpStatus: '', responseHeaders: '', responseBody: '', latency: null, verdict: 'ok', verdictIcon: '', verdictText: '' },
   { name: '/api/ → mainApi', url: '/api/v1/plugin/verify-token', expectedBackend: 'proxy_pass → 主后端', status: 'pending', httpStatus: '', responseHeaders: '', responseBody: '', latency: null, verdict: 'ok', verdictIcon: '', verdictText: '' },
   { name: '/health', url: '/health', expectedBackend: '本地 Nginx 直接返回', status: 'pending', httpStatus: '', responseHeaders: '', responseBody: '', latency: null, verdict: 'ok', verdictIcon: '', verdictText: '' },
   { name: '/debug-env', url: '/debug-env', expectedBackend: '本地 Nginx 静态文件', status: 'pending', httpStatus: '', responseHeaders: '', responseBody: '', latency: null, verdict: 'ok', verdictIcon: '', verdictText: '' },

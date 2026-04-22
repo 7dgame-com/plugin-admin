@@ -1,7 +1,7 @@
 export default {
   pluginMeta: {
     name: '系統管理',
-    description: '外掛權限、註冊與組織唯讀總覽工具',
+    description: '外掛註冊與組織唯讀總覽工具',
     groupName: '系統',
   },
   common: {
@@ -53,28 +53,6 @@ export default {
     rootOnlyDenied: '僅 root 可存取 system-admin',
     managerOnlyDenied: '僅 manager 或 root 可存取此頁面',
     sessionExpired: '登入已失效，請重新登入',
-  },
-  permission: {
-    title: '外掛權限管理',
-    addTitle: '新增權限配置',
-    editTitle: '編輯權限配置',
-    roleOrPermission: '角色/權限',
-    roleOrPermissionLabel: '角色/權限名稱',
-    pluginName: '外掛識別',
-    action: '操作',
-    searchRolePlaceholder: '搜尋角色或權限',
-    searchPluginPlaceholder: '搜尋外掛',
-    searchActionPlaceholder: '搜尋操作',
-    rolePlaceholder: '如: root, admin',
-    pluginPlaceholder: '如: user-management',
-    actionPlaceholder: '如: manage-permissions',
-    deleteConfirm: '確定刪除權限配置 "{role} / {plugin} / {action}"？',
-    messages: {
-      loadFailed: '載入權限配置失敗',
-      roleRequired: '請輸入角色/權限名稱',
-      pluginRequired: '請輸入外掛識別',
-      actionRequired: '請輸入操作',
-    },
   },
   plugin: {
     title: '外掛註冊管理',

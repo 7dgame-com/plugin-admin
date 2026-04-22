@@ -1,7 +1,7 @@
 export default {
   pluginMeta: {
     name: 'システム管理',
-    description: 'プラグイン権限、登録、組織の閲覧専用一覧ツール',
+    description: 'プラグイン登録と組織の閲覧専用一覧ツール',
     groupName: 'システム',
   },
   common: {
@@ -53,28 +53,6 @@ export default {
     rootOnlyDenied: 'system-admin にアクセスできるのは root のみです',
     managerOnlyDenied: 'このページにアクセスできるのは manager または root のみです',
     sessionExpired: 'セッションの有効期限が切れました。再度ログインしてください。',
-  },
-  permission: {
-    title: 'プラグイン権限管理',
-    addTitle: '権限設定を追加',
-    editTitle: '権限設定を編集',
-    roleOrPermission: 'ロール / 権限',
-    roleOrPermissionLabel: 'ロール / 権限名',
-    pluginName: 'プラグイン ID',
-    action: '操作',
-    searchRolePlaceholder: 'ロールまたは権限を検索',
-    searchPluginPlaceholder: 'プラグインを検索',
-    searchActionPlaceholder: '操作を検索',
-    rolePlaceholder: '例: root, admin',
-    pluginPlaceholder: '例: user-management',
-    actionPlaceholder: '例: manage-permissions',
-    deleteConfirm: '権限設定 "{role} / {plugin} / {action}" を削除しますか？',
-    messages: {
-      loadFailed: '権限設定の読み込みに失敗しました',
-      roleRequired: 'ロール / 権限名を入力してください',
-      pluginRequired: 'プラグイン ID を入力してください',
-      actionRequired: '操作を入力してください',
-    },
   },
   plugin: {
     title: 'プラグイン登録管理',
