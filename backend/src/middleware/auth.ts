@@ -106,7 +106,7 @@ function parseTokenIssuerContext(token: string): { host: string; proto: string }
   };
 }
 
-function buildTokenVerificationHeaders(token: string, req?: Request): Record<string, string> {
+export function buildTokenVerificationHeaders(token: string, req?: Request): Record<string, string> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
   };

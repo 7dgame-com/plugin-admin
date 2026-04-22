@@ -2,8 +2,14 @@ import axios from 'axios';
 import { Request, Response } from 'express';
 import { QueryRow, pluginPool } from '../db/pluginDb';
 import { hasPluginOrganizationNameColumn } from '../db/pluginSchema';
-import { AuthenticatedRequest, UserOrganizationSummary, verifyBearerToken } from '../middleware/auth';
+import {
+  AuthenticatedRequest,
+  UserOrganizationSummary,
+  buildTokenVerificationHeaders,
+  verifyBearerToken,
+} from '../middleware/auth';
 import { getAllowedActions, hasPermission } from '../middleware/permission';
+import { requestMainApiGet } from '../utils/mainApi';
 import { decodeJsonField, deriveOriginFromUrl, normalizeOriginList } from '../utils/pluginData';
 import { error, success } from '../utils/response';
 
@@ -30,6 +36,55 @@ function normalizeAccessScope(value: unknown): string {
   return typeof value === 'string' && ACCESS_SCOPE_VALUES.has(value)
     ? value
     : DEFAULT_ACCESS_SCOPE;
+}
+
+function parseOrganizationSummaries(rawValue: unknown): UserOrganizationSummary[] {
+  const payload = rawValue && typeof rawValue === 'object' && 'data' in rawValue
+    ? (rawValue as { data?: unknown }).data
+    : rawValue;
+
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload.flatMap((organization) => {
+    if (!organization || typeof organization !== 'object') {
+      return [];
+    }
+
+    const rawId = (organization as { id?: unknown }).id;
+    const id = Number(rawId);
+    const name = (organization as { name?: unknown }).name;
+    const title = (organization as { title?: unknown }).title;
+
+    if (!Number.isInteger(id) || id <= 0 || typeof name !== 'string' || name.trim() === '') {
+      return [];
+    }
+
+    const normalizedName = name.trim();
+    const normalizedTitle = typeof title === 'string' && title.trim() !== ''
+      ? title.trim()
+      : normalizedName;
+
+    return [{
+      id,
+      name: normalizedName,
+      title: normalizedTitle,
+    }];
+  });
+}
+
+async function fetchOrganizationSummaries(token: string, req: Request): Promise<UserOrganizationSummary[]> {
+  try {
+    const { response } = await requestMainApiGet('/v1/organization/list', {
+      key: token,
+      headers: buildTokenVerificationHeaders(token, req),
+    });
+
+    return parseOrganizationSummaries(response.data);
+  } catch {
+    return [];
+  }
 }
 
 export async function checkPermission(req: Request, res: Response): Promise<void> {
@@ -78,6 +133,7 @@ export async function list(req: Request, res: Response): Promise<void> {
   const authorization = req.headers?.authorization;
   let organizations: UserOrganizationSummary[] = [];
   let roles: string[] = [];
+  let verifiedBearerToken: string | null = null;
 
   if (authorization !== undefined) {
     if (!authorization.startsWith('Bearer ')) {
@@ -94,6 +150,7 @@ export async function list(req: Request, res: Response): Promise<void> {
           if (user) {
             organizations = user.organizations ?? [];
             roles = user.roles ?? [];
+            verifiedBearerToken = token;
           }
         } catch (err) {
           if (axios.isAxiosError(err) && (err.response?.status === 401 || err.response?.status === 403)) {
@@ -162,12 +219,6 @@ export async function list(req: Request, res: Response): Promise<void> {
       );
     }
 
-    const organizationTitleMap = new Map(
-      organizations.map((organization) => [
-        organization.name,
-        organization.title || organization.name,
-      ])
-    );
     const pluginOrganizationNames = hasOrganizationNameColumn
       ? Array.from(
           new Set(
@@ -177,6 +228,22 @@ export async function list(req: Request, res: Response): Promise<void> {
           )
         )
       : [];
+    const organizationTitleMap = new Map(
+      organizations.map((organization) => [
+        organization.name,
+        organization.title || organization.name,
+      ])
+    );
+    const missingOrganizationTitles = pluginOrganizationNames.filter((name) => !organizationTitleMap.has(name));
+
+    if (verifiedBearerToken !== null && missingOrganizationTitles.length > 0) {
+      for (const organization of await fetchOrganizationSummaries(verifiedBearerToken, req)) {
+        if (missingOrganizationTitles.includes(organization.name)) {
+          organizationTitleMap.set(organization.name, organization.title || organization.name);
+        }
+      }
+    }
+
     const menuGroups = [
       {
         id: 'org:public',
