@@ -18,7 +18,7 @@ const {
 }))
 
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: { redirect: '/plugins' } }),
+  useRoute: () => ({ query: {} }),
   useRouter: () => ({ replace }),
 }))
 
@@ -53,7 +53,7 @@ describe('LoginView', () => {
     removeAllTokens.mockReset()
   })
 
-  it('stores tokens and redirects root users after a successful login', async () => {
+  it('stores tokens and redirects root users to the plugin registry by default', async () => {
     authPost.mockResolvedValue({
       data: {
         success: true,

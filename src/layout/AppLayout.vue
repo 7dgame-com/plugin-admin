@@ -15,15 +15,6 @@
       </div>
       <nav class="sidebar-nav">
         <router-link
-          to="/permissions"
-          class="sidebar-item"
-          :class="{ active: $route.path === '/permissions' }"
-          @click="sidebarOpen = false"
-        >
-          <el-icon><Key /></el-icon>
-          <span>{{ t('permission.title') }}</span>
-        </router-link>
-        <router-link
           to="/plugins"
           class="sidebar-item"
           :class="{ active: $route.path === '/plugins' }"
@@ -83,7 +74,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Close, Fold, Key, Grid, OfficeBuilding, User, Loading } from '@element-plus/icons-vue'
+import { Close, Fold, Grid, OfficeBuilding, User, Loading } from '@element-plus/icons-vue'
 import { useAuthSession } from '../composables/useAuthSession'
 import { getRuntimeMode, removeAllTokens } from '../utils/token'
 

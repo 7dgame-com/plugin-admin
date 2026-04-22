@@ -202,12 +202,6 @@ setupInterceptors(mainApi)
 // 默认导出 adminApi，同时具名导出 pluginApi
 export default adminApi
 
-// 权限配置 API
-export const getPermissions = (params?: Record<string, unknown>) => adminApi.get('/permissions', { params })
-export const createPermission = (data: Record<string, unknown>) => adminApi.post('/create-permission', data)
-export const updatePermission = (data: Record<string, unknown>) => adminApi.put('/update-permission', data)
-export const deletePermission = (id: number) => adminApi.post('/delete-permission', { id })
-
 // 插件注册 API
 export const getPlugins = (params?: Record<string, unknown>) => adminApi.get('/plugins', { params })
 export const createPlugin = (data: Record<string, unknown>) => adminApi.post('/create-plugin', data)

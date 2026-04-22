@@ -25,4 +25,14 @@ describe('system-admin root-only wiring', () => {
     expect(source).not.toContain('fetchPermissions')
     expect(source).not.toContain('usePermissions')
   })
+
+  it('removes the obsolete permission configuration UI route and navigation', () => {
+    const routerSource = fs.readFileSync(path.resolve(__dirname, '../router/index.ts'), 'utf8')
+    const layoutSource = fs.readFileSync(path.resolve(__dirname, '../layout/AppLayout.vue'), 'utf8')
+
+    expect(routerSource).not.toContain('/permissions')
+    expect(routerSource).not.toContain('PermissionList')
+    expect(layoutSource).not.toContain('/permissions')
+    expect(layoutSource).not.toContain('permission.title')
+  })
 })

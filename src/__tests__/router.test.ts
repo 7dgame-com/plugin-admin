@@ -38,7 +38,6 @@ vi.mock('../views/LoginView.vue', () => ({ default: { template: '<div>LoginView<
 vi.mock('../views/NotAllowed.vue', () => ({ default: { template: '<div>NotAllowed</div>' } }))
 vi.mock('../views/ApiDiagnostics.vue', () => ({ default: { template: '<div>ApiDiagnostics</div>' } }))
 vi.mock('../layout/AppLayout.vue', () => ({ default: { template: '<div><router-view /></div>' } }))
-vi.mock('../views/PermissionList.vue', () => ({ default: { template: '<div>PermissionList</div>' } }))
 vi.mock('../views/PluginList.vue', () => ({ default: { template: '<div>PluginList</div>' } }))
 vi.mock('../views/OrganizationList.vue', () => ({ default: { template: '<div>OrganizationList</div>' } }))
 
@@ -69,19 +68,19 @@ describe('router auth guards', () => {
   it('redirects standalone unauthenticated requests to /login with a redirect query', async () => {
     mockGetToken.mockReturnValue(null)
 
-    await router.push('/permissions')
+    await router.push('/plugins')
 
     expect(router.currentRoute.value.name).toBe('Login')
-    expect(router.currentRoute.value.query.redirect).toBe('/permissions')
+    expect(router.currentRoute.value.query.redirect).toBe('/plugins')
   })
 
   it('does not force embedded unauthenticated requests onto /login', async () => {
     mockGetToken.mockReturnValue(null)
     mockGetRuntimeMode.mockReturnValue('embedded')
 
-    await router.push('/permissions')
+    await router.push('/plugins')
 
-    expect(router.currentRoute.value.path).toBe('/permissions')
+    expect(router.currentRoute.value.path).toBe('/plugins')
   })
 
   it('waits for the auth session before allowing a root-only route', async () => {
@@ -93,10 +92,25 @@ describe('router auth guards', () => {
     })
 
     await router.push('/login')
-    await router.push('/permissions')
+    await router.push('/plugins')
 
     expect(mockFetchSession).toHaveBeenCalledTimes(1)
-    expect(router.currentRoute.value.name).toBe('PermissionList')
+    expect(router.currentRoute.value.name).toBe('PluginList')
+  })
+
+  it('uses plugin registry as the default root destination', async () => {
+    await router.push('/')
+
+    expect(router.currentRoute.value.path).toBe('/plugins')
+    expect(router.currentRoute.value.name).toBe('PluginList')
+  })
+
+  it('does not register the obsolete permission configuration route', () => {
+    const routePaths = router.getRoutes().map((route) => route.path)
+    const routeNames = router.getRoutes().map((route) => route.name)
+
+    expect(routePaths).not.toContain('/permissions')
+    expect(routeNames).not.toContain('PermissionList')
   })
 })
 

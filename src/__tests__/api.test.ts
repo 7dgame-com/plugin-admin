@@ -52,6 +52,15 @@ describe('Property 1: API baseURL 包含 /backend/api 前缀', () => {
 
     expect(getSpy).toHaveBeenCalledWith('/plugin/verify-token')
   })
+
+  it('does not export obsolete permission configuration helpers', async () => {
+    const api = await import('../api/index')
+
+    expect('getPermissions' in api).toBe(false)
+    expect('createPermission' in api).toBe(false)
+    expect('updatePermission' in api).toBe(false)
+    expect('deletePermission' in api).toBe(false)
+  })
 })
 
 // Feature: system-admin-plugin-upgrade, Property 5: x-refresh-token 响应头自动持久化
