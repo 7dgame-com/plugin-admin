@@ -351,9 +351,10 @@ while true; do
   BACKEND_LIST="${BACKEND_LIST}\"APP_BACKEND_${i}_URL\": \"${url}\""
   i=$((i + 1))
 done
+DEBUG_LIST="${API_LIST}${API_LIST:+, }${BACKEND_LIST}"
 cat > /usr/share/nginx/html/debug-env.json <<EOF
 {
-  ${API_LIST}${API_LIST:+, }${BACKEND_LIST},
+  ${DEBUG_LIST}${DEBUG_LIST:+, }
   "buildTime": "$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')",
   "hostname": "$(hostname)"
 }
