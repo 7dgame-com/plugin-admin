@@ -20,4 +20,10 @@ describe('docker entrypoint nginx generation', () => {
     expect(entrypoint).toContain('generate_lb_config "APP_API" "/api/" "api"')
     expect(entrypoint).toContain('generate_lb_config "APP_BACKEND" "/backend/" "backend"')
   })
+
+  it('formats debug-env JSON with a conditional upstream comma', () => {
+    expect(entrypoint).toContain('DEBUG_LIST="${API_LIST}${API_LIST:+, }${BACKEND_LIST}"')
+    expect(entrypoint).toContain('${DEBUG_LIST}${DEBUG_LIST:+, }')
+    expect(entrypoint).not.toContain('${API_LIST}${API_LIST:+, }${BACKEND_LIST},')
+  })
 })
