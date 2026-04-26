@@ -62,21 +62,32 @@ function parseOrganizationSummaries(rawValue: unknown): UserOrganizationSummary[
     }
 
     const normalizedName = name.trim();
-    const normalizedTitle = typeof title === 'string' && title.trim() !== ''
-      ? title.trim()
-      : normalizedName;
+    if (typeof title !== 'string' || title.trim() === '') {
+      return [];
+    }
 
     return [{
       id,
       name: normalizedName,
-      title: normalizedTitle,
+      title: title.trim(),
     }];
   });
 }
 
-async function fetchOrganizationSummaries(token: string, req: Request): Promise<UserOrganizationSummary[]> {
+async function fetchOrganizationSummaries(
+  token: string,
+  req: Request,
+  names: string[],
+): Promise<UserOrganizationSummary[]> {
+  if (names.length === 0) {
+    return [];
+  }
+
+  const params = new URLSearchParams();
+  params.set('names', names.join(','));
+
   try {
-    const { response } = await requestMainApiGet('/v1/organization/list', {
+    const { response } = await requestMainApiGet(`/v1/organization/list?${params.toString()}`, {
       key: token,
       headers: buildTokenVerificationHeaders(token, req),
     });
@@ -229,17 +240,17 @@ export async function list(req: Request, res: Response): Promise<void> {
         )
       : [];
     const organizationTitleMap = new Map(
-      organizations.map((organization) => [
-        organization.name,
-        organization.title || organization.name,
-      ])
+      organizations.map((organization) => [organization.name, organization.title])
     );
-    const missingOrganizationTitles = pluginOrganizationNames.filter((name) => !organizationTitleMap.has(name));
+    const missingOrganizationTitles = pluginOrganizationNames.filter((name) => {
+      const title = organizationTitleMap.get(name)?.trim();
+      return title === undefined || title === '' || title === name;
+    });
 
     if (verifiedBearerToken !== null && missingOrganizationTitles.length > 0) {
-      for (const organization of await fetchOrganizationSummaries(verifiedBearerToken, req)) {
+      for (const organization of await fetchOrganizationSummaries(verifiedBearerToken, req, missingOrganizationTitles)) {
         if (missingOrganizationTitles.includes(organization.name)) {
-          organizationTitleMap.set(organization.name, organization.title || organization.name);
+          organizationTitleMap.set(organization.name, organization.title);
         }
       }
     }

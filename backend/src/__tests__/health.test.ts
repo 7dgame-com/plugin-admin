@@ -1,11 +1,17 @@
 jest.mock('../db/pluginDb', () => ({
+  pluginPool: {
+    query: jest.fn(),
+  },
   pingPluginDb: jest.fn().mockResolvedValue(undefined),
 }));
 
 import request from 'supertest';
 import { createApp } from '../index';
 
-const { pingPluginDb } = jest.requireMock('../db/pluginDb') as {
+const { pingPluginDb, pluginPool } = jest.requireMock('../db/pluginDb') as {
+  pluginPool: {
+    query: jest.Mock;
+  };
   pingPluginDb: jest.Mock;
 };
 
@@ -18,6 +24,7 @@ describe('health route', () => {
       GIT_SHA: 'abc123def456',
       BUILD_TIME: '2026-04-21T12:58:00Z',
     };
+    pluginPool.query.mockReset().mockResolvedValue([[{ Field: 'organization_name' }]]);
     pingPluginDb.mockReset().mockResolvedValue(undefined);
   });
 

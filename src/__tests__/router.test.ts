@@ -112,6 +112,25 @@ describe('router auth guards', () => {
     expect(routePaths).not.toContain('/permissions')
     expect(routeNames).not.toContain('PermissionList')
   })
+
+  it('sends plugin-url-changed events after route changes', async () => {
+    const postMessageSpy = vi
+      .spyOn(window.parent, 'postMessage')
+      .mockImplementation(() => undefined)
+
+    await router.push('/organizations?tab=members#top')
+
+    expect(postMessageSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'EVENT',
+        payload: {
+          event: 'plugin-url-changed',
+          pluginUrl: '/organizations?tab=members#top',
+        },
+      }),
+      '*'
+    )
+  })
 })
 
 describe('router organization migration', () => {

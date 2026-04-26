@@ -329,18 +329,28 @@ describe('public API routes', () => {
   it('returns all enabled plugins and organization groups for authenticated root users', async () => {
     const app = createApp();
 
-    mockedAxios.get.mockResolvedValueOnce({
-      data: {
-        code: 0,
-        message: 'ok',
+    mockedAxios.get
+      .mockResolvedValueOnce({
         data: {
-          id: 1,
-          username: 'root',
-          roles: ['root'],
-          organizations: [{ id: 2, name: 'acme', title: 'Acme Studio' }],
+          code: 0,
+          message: 'ok',
+          data: {
+            id: 1,
+            username: 'root',
+            roles: ['root'],
+            organizations: [{ id: 2, name: 'acme', title: 'Acme Studio' }],
+          },
         },
-      },
-    } as never);
+      } as never)
+      .mockResolvedValueOnce({
+        data: {
+          code: 0,
+          message: 'ok',
+          data: [
+            { id: 9, name: 'north', title: 'North Studio' },
+          ],
+        },
+      } as never);
 
     pluginPool.query.mockResolvedValueOnce([
       [
@@ -398,7 +408,7 @@ describe('public API routes', () => {
         },
         {
           id: 'org:north',
-          name: 'north',
+          name: 'North Studio',
           nameI18n: null,
           icon: 'OfficeBuilding',
           order: 1,
@@ -492,12 +502,135 @@ describe('public API routes', () => {
     expect(response.status).toBe(200);
     expect(mockedAxios.get).toHaveBeenNthCalledWith(
       2,
-      expect.stringContaining('/v1/organization/list'),
+      expect.stringContaining('/v1/organization/list?names=msc'),
       expect.any(Object)
     );
     expect(response.body.menuGroups).toContainEqual({
       id: 'org:msc',
       name: '澳門科學館',
+      nameI18n: null,
+      icon: 'OfficeBuilding',
+      order: 1,
+    });
+  });
+
+  it('refreshes organization titles when token organizations only expose the organization name', async () => {
+    const app = createApp();
+
+    mockedAxios.get
+      .mockResolvedValueOnce({
+        data: {
+          code: 0,
+          message: 'ok',
+          data: {
+            id: 1,
+            username: 'root',
+            roles: ['root'],
+            organizations: [{ id: 33, name: 'test', title: 'test' }],
+          },
+        },
+      } as never)
+      .mockResolvedValueOnce({
+        data: {
+          code: 0,
+          message: 'ok',
+          data: [
+            { id: 33, name: 'test', title: '托尔斯泰' },
+          ],
+        },
+      } as never);
+
+    pluginPool.query.mockResolvedValueOnce([
+      [
+        {
+          id: 'ai-3d-generator-v3',
+          name: 'AI 3D 生成器 V3',
+          name_i18n: null,
+          description: 'generator',
+          url: 'https://a23.plugins.xrugc.com/',
+          icon: 'MagicStick',
+          enabled: 1,
+          order: 1,
+          allowed_origin: null,
+          allowed_host_origins: null,
+          version: '1.0.0',
+          access_scope: 'manager-only',
+          organization_name: 'test',
+        },
+      ],
+    ]);
+
+    const response = await request(app)
+      .get('/api/v1/plugin/list')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(mockedAxios.get).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('/v1/organization/list?names=test'),
+      expect.any(Object)
+    );
+    expect(response.body.menuGroups).toContainEqual({
+      id: 'org:test',
+      name: '托尔斯泰',
+      nameI18n: null,
+      icon: 'OfficeBuilding',
+      order: 1,
+    });
+  });
+
+  it('falls back to organization names for root-visible plugin groups when the main organization list has no matching title', async () => {
+    const app = createApp();
+
+    mockedAxios.get
+      .mockResolvedValueOnce({
+        data: {
+          code: 0,
+          message: 'ok',
+          data: {
+            id: 1,
+            username: 'root',
+            roles: ['root'],
+            organizations: [],
+          },
+        },
+      } as never)
+      .mockResolvedValueOnce({
+        data: {
+          code: 0,
+          message: 'ok',
+          data: [],
+        },
+      } as never);
+
+    pluginPool.query.mockResolvedValueOnce([
+      [
+        {
+          id: 'ai-3d-generator-v3',
+          name: 'AI 3D 生成器 V3',
+          name_i18n: null,
+          description: 'generator',
+          url: 'https://a23.plugins.xrugc.com/',
+          icon: 'MagicStick',
+          enabled: 1,
+          order: 1,
+          allowed_origin: null,
+          allowed_host_origins: null,
+          version: '1.0.0',
+          access_scope: 'manager-only',
+          organization_name: 'msc',
+        },
+      ],
+    ]);
+
+    const response = await request(app)
+      .get('/api/v1/plugin/list')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(response.body.menuGroups).toContainEqual({
+      id: 'org:msc',
+      name: 'msc',
       nameI18n: null,
       icon: 'OfficeBuilding',
       order: 1,

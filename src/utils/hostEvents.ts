@@ -1,5 +1,6 @@
 type HostEventPayload = {
   event: string
+  pluginUrl?: string
 }
 
 type HostEventMessage = {
@@ -24,4 +25,8 @@ function postHostEvent(payload: HostEventPayload): void {
 
 export function notifyHostPluginRegistryChanged(): void {
   postHostEvent({ event: 'plugin-registry-changed' })
+}
+
+export function notifyHostPluginUrlChanged(pluginUrl: string): void {
+  postHostEvent({ event: 'plugin-url-changed', pluginUrl })
 }

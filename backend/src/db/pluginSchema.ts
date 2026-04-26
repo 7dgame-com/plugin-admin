@@ -69,6 +69,38 @@ export async function hasPluginAccessScopeColumn(): Promise<boolean> {
   return hasAccessScopeColumnCache;
 }
 
+async function columnExists(columnName: string): Promise<boolean> {
+  const [rows] = await pluginPool.query<ColumnRow[]>(
+    `SHOW COLUMNS FROM plugins LIKE '${columnName}'`
+  );
+
+  return rows.length > 0;
+}
+
+export async function ensurePluginSchemaColumns(): Promise<void> {
+  if (hasAccessScopeColumnCache === true && hasOrganizationNameColumnCache === true) {
+    return;
+  }
+
+  const hasAccessScopeColumn = await columnExists('access_scope');
+  const hasOrganizationNameColumn = await columnExists('organization_name');
+
+  if (!hasAccessScopeColumn) {
+    await pluginPool.query(
+      "ALTER TABLE `plugins` ADD COLUMN `access_scope` varchar(32) NOT NULL DEFAULT 'auth-only' COMMENT '宿主菜单可见性范围: auth-only/admin-only/manager-only/root-only' AFTER `version`"
+    );
+  }
+
+  if (!hasOrganizationNameColumn) {
+    await pluginPool.query(
+      "ALTER TABLE `plugins` ADD COLUMN `organization_name` varchar(128) DEFAULT NULL COMMENT '插件组织归属，NULL 表示公共插件' AFTER `access_scope`"
+    );
+  }
+
+  hasAccessScopeColumnCache = true;
+  hasOrganizationNameColumnCache = true;
+}
+
 export function resetPluginSchemaCacheForTests(): void {
   hasOrganizationNameColumnCache = null;
   hasAccessScopeColumnCache = null;

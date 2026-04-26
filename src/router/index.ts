@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthSession } from '../composables/useAuthSession'
+import { notifyHostPluginUrlChanged } from '../utils/hostEvents'
 import { getRuntimeMode, getToken } from '../utils/token'
 
 declare module 'vue-router' {
@@ -94,5 +95,9 @@ export async function permissionGuard(
 }
 
 router.beforeEach(permissionGuard)
+
+router.afterEach((to) => {
+  notifyHostPluginUrlChanged(to.fullPath)
+})
 
 export default router

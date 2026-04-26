@@ -2,6 +2,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express, { NextFunction, Request, Response } from 'express';
 import { pingPluginDb } from './db/pluginDb';
+import { ensurePluginSchemaColumns } from './db/pluginSchema';
 import { openApiDocument } from './openapi/spec';
 import diagnosticsRouter from './routes/diagnostics';
 import permissionsRouter from './routes/permissions';
@@ -35,6 +36,7 @@ export function createApp() {
 
   app.get('/health', async (_req, res) => {
     try {
+      await ensurePluginSchemaColumns();
       await pingPluginDb();
       const buildInfo = getBuildInfo();
       res.set('X-Service-Version', buildInfo.version);
@@ -66,6 +68,7 @@ export function createApp() {
 }
 
 async function bootstrap() {
+  await ensurePluginSchemaColumns();
   await pingPluginDb();
 
   const port = Number(process.env.PORT || 8088);
