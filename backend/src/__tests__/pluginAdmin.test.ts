@@ -322,10 +322,61 @@ describe('plugin-admin routes', () => {
     expect(params).toEqual([
       'Demo Plugin',
       'https://new.example.com/app/index.html',
+      JSON.stringify({ 'zh-CN': 'Demo Plugin' }),
       'https://new.example.com',
       'demo-plugin',
     ]);
     expect(response.body.data.organization_name).toBeNull();
+  });
+
+  it('syncs zh-CN name_i18n when updating a plugin name without an explicit i18n payload', async () => {
+    const app = createApp();
+
+    pluginPool.query
+      .mockResolvedValueOnce([
+        [
+          {
+            id: 'ar-slam-localization',
+            name: 'AR SLAM 定位',
+            name_i18n: JSON.stringify({
+              'zh-CN': 'AR SLAM 定位',
+              'en-US': 'AR SLAM Localization',
+            }),
+            url: 'https://ar.plugins.xrugc.com/app',
+          },
+        ],
+      ])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    const response = await request(app)
+      .put('/api/v1/plugin-admin/update-plugin')
+      .set('Authorization', 'Bearer token')
+      .send({
+        id: 'ar-slam-localization',
+        name: 'AR',
+      });
+
+    expect(response.status).toBe(200);
+    expect(pluginPool.query).toHaveBeenCalledTimes(2);
+    const [sql, params] = pluginPool.query.mock.calls[1] as [string, unknown[]];
+    expect(sql).toContain('`name` = ?');
+    expect(sql).toContain('`name_i18n` = ?');
+    expect(params).toEqual([
+      'AR',
+      JSON.stringify({
+        'zh-CN': 'AR',
+        'en-US': 'AR SLAM Localization',
+      }),
+      'ar-slam-localization',
+    ]);
+    expect(response.body.data).toMatchObject({
+      id: 'ar-slam-localization',
+      name: 'AR',
+      name_i18n: JSON.stringify({
+        'zh-CN': 'AR',
+        'en-US': 'AR SLAM Localization',
+      }),
+    });
   });
 
   it('does not mount legacy menu-group routes anymore', async () => {

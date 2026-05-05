@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { QueryRow, pluginPool } from '../db/pluginDb';
 import { hasPluginAccessScopeColumn, hasPluginOrganizationNameColumn } from '../db/pluginSchema';
 import {
+  decodeJsonField,
   deriveOriginFromUrl,
   encodeJsonField,
   normalizeOriginList,
@@ -143,6 +144,22 @@ function buildPluginPayload(
     access_scope: normalizeAccessScope(body.access_scope) ?? DEFAULT_ACCESS_SCOPE,
     organization_name: body.organization_name ?? null,
   };
+}
+
+function syncZhCnNameI18n(existingNameI18n: unknown, name: string): unknown {
+  const decoded = decodeJsonField(existingNameI18n);
+  const nextNameI18n: Record<string, string> = {};
+
+  if (decoded && typeof decoded === 'object' && !Array.isArray(decoded)) {
+    for (const [key, value] of Object.entries(decoded)) {
+      if (typeof value === 'string') {
+        nextNameI18n[key] = value;
+      }
+    }
+  }
+
+  nextNameI18n['zh-CN'] = name;
+  return encodeJsonField(nextNameI18n);
 }
 
 function serializePluginRow(row: PluginRow): SerializedPluginRow {
@@ -402,6 +419,13 @@ export async function updatePlugin(req: Request, res: Response): Promise<void> {
       updates.push(`\`${field}\` = ?`);
       params.push(value);
       responseData[field] = value;
+    }
+
+    if (req.body?.name !== undefined && req.body?.name_i18n === undefined) {
+      const value = syncZhCnNameI18n(existingRows[0].name_i18n, String(req.body.name));
+      updates.push('`name_i18n` = ?');
+      params.push(value);
+      responseData.name_i18n = value;
     }
 
     if (!hasOrganizationNameColumn && req.body?.organization_name !== undefined) {

@@ -150,12 +150,14 @@ import {
   type OrganizationItem,
 } from '../api'
 import { notifyHostPluginRegistryChanged } from '../utils/hostEvents'
+import { mergeNameI18nForLocale, type NameI18nSource } from '../utils/nameI18n'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 interface PluginItem {
   id: string
   name: string
+  name_i18n?: NameI18nSource
   url: string
   organization_name: string | null
   access_scope: 'auth-only' | 'admin-only' | 'manager-only' | 'root-only'
@@ -182,6 +184,7 @@ const pagination = reactive({ page: 1, perPage: 20, total: 0 })
 const form = reactive({
   id: '',
   name: '',
+  name_i18n: null as NameI18nSource,
   url: '',
   organization_name: '',
   access_scope: 'auth-only' as PluginItem['access_scope'],
@@ -325,6 +328,7 @@ function resetForm() {
   Object.assign(form, {
     id: '',
     name: '',
+    name_i18n: null,
     url: '',
     organization_name: '',
     access_scope: 'auth-only',
@@ -348,6 +352,7 @@ function openEditDialog(row: PluginItem) {
   Object.assign(form, {
     id: row.id,
     name: row.name,
+    name_i18n: row.name_i18n ?? null,
     url: row.url,
     organization_name: row.organization_name || '',
     access_scope: row.access_scope || 'auth-only',
@@ -381,6 +386,7 @@ async function handleSubmit() {
       const payload = {
         ...form,
         enabled: form.enabled ? 1 : 0,
+        name_i18n: mergeNameI18nForLocale(form.name_i18n, locale.value, form.name),
         organization_name: form.organization_name || null,
         allowed_host_origins: normalizeOriginList(form.allowed_host_origins),
       }
