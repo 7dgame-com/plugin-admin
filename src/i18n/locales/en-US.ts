@@ -86,6 +86,7 @@ export default {
     messages: {
       loadFailed: 'Failed to load plugin list',
       idRequired: 'Please enter plugin ID',
+      idInvalid: 'Plugin ID can only contain letters, numbers, and hyphens',
       nameRequired: 'Please enter name',
       urlRequired: 'Please enter URL',
       allowedHostOriginInvalid: 'Allowed host origins contains an invalid URL',

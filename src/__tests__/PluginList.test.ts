@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { defineComponent, h, inject, provide, ref, toRef } from 'vue'
+import { defineComponent, h, inject, provide, reactive, ref, toRef } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import PluginList from '../views/PluginList.vue'
@@ -156,7 +156,119 @@ const ElDialogStub = defineComponent({
     },
   },
   setup(props, { slots }) {
-    return () => (props.modelValue ? h('div', { class: 'el-dialog-stub' }, slots.default?.()) : null)
+    return () =>
+      props.modelValue
+        ? h('div', { class: 'el-dialog-stub' }, [slots.default?.(), slots.footer?.()])
+        : null
+  },
+})
+
+const ElFormStub = defineComponent({
+  name: 'ElFormStub',
+  props: {
+    model: {
+      type: Object,
+      default: () => ({}),
+    },
+    rules: {
+      type: Object,
+      default: () => ({}),
+    },
+  },
+  setup(props, { expose, slots }) {
+    const errors = reactive<string[]>([])
+
+    function resolveMessage(message: unknown) {
+      return typeof message === 'function' ? String(message()) : String(message ?? '')
+    }
+
+    async function validate(callback?: (valid: boolean) => void | Promise<void>) {
+      errors.splice(0, errors.length)
+
+      Object.entries(props.rules).forEach(([field, fieldRules]) => {
+        const value = (props.model as Record<string, unknown>)[field]
+        const rules = Array.isArray(fieldRules) ? fieldRules : [fieldRules]
+
+        rules.some((rule: any) => {
+          const textValue = typeof value === 'string' ? value : String(value ?? '')
+          const missingRequired = rule.required && textValue.trim() === ''
+          const patternMismatch = rule.pattern instanceof RegExp && !rule.pattern.test(textValue)
+
+          if (missingRequired || patternMismatch) {
+            errors.push(resolveMessage(rule.message))
+            return true
+          }
+
+          return false
+        })
+      })
+
+      const valid = errors.length === 0
+      await callback?.(valid)
+      return valid
+    }
+
+    expose({ validate })
+
+    return () =>
+      h('form', { class: 'el-form-stub' }, [
+        slots.default?.(),
+        errors.map((message) => h('div', { class: 'el-form-error-stub' }, message)),
+      ])
+  },
+})
+
+const ElInputStub = defineComponent({
+  name: 'ElInputStub',
+  props: {
+    modelValue: {
+      type: [String, Number],
+      default: '',
+    },
+    placeholder: {
+      type: String,
+      default: '',
+    },
+    disabled: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  emits: ['update:modelValue'],
+  setup(props, { emit }) {
+    return () =>
+      h('input', {
+        class: 'el-input-stub',
+        disabled: props.disabled,
+        placeholder: props.placeholder,
+        'data-placeholder': props.placeholder,
+        value: props.modelValue,
+        onInput: (event: Event) => {
+          emit('update:modelValue', (event.target as HTMLInputElement).value)
+        },
+      })
+  },
+})
+
+const ElInputNumberStub = defineComponent({
+  name: 'ElInputNumberStub',
+  props: {
+    modelValue: {
+      type: Number,
+      default: 0,
+    },
+  },
+  emits: ['update:modelValue'],
+  setup(props, { emit }) {
+    return () =>
+      h('input', {
+        class: 'el-input-number-stub',
+        type: 'number',
+        value: props.modelValue,
+        onInput: (event: Event) => {
+          emit('update:modelValue', Number((event.target as HTMLInputElement).value))
+        },
+      })
   },
 })
 
@@ -198,12 +310,12 @@ function mountPluginList() {
         ElCard: passthroughStub,
         ElPagination: passthroughStub,
         ElDialog: ElDialogStub,
-        ElForm: passthroughStub,
+        ElForm: ElFormStub,
         ElFormItem: passthroughStub,
-        ElInput: passthroughStub,
+        ElInput: ElInputStub,
         ElSelect: passthroughStub,
         ElOption: passthroughStub,
-        ElInputNumber: passthroughStub,
+        ElInputNumber: ElInputNumberStub,
       },
     },
   })
@@ -307,5 +419,29 @@ describe('PluginList', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('manager 或 root')
+  })
+
+  it('rejects plugin ids with spaces before sending a create request', async () => {
+    const wrapper = mountPluginList()
+
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '新增插件')!
+      .trigger('click')
+
+    await wrapper.get('input[data-placeholder="如: my-plugin"]').setValue('ar slam')
+    await wrapper.get('input[data-placeholder="插件显示名称"]').setValue('AR SLAM')
+    await wrapper
+      .get('input[data-placeholder="https://..."]')
+      .setValue('https://ar-slam.d.plugins.xrugc.com/workbench')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '确定')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(createPlugin).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('插件ID只能包含字母、数字和连字符')
   })
 })

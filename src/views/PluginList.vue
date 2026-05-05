@@ -196,8 +196,17 @@ const form = reactive({
   description: '',
 })
 
+const pluginIdPattern = /^[a-zA-Z0-9-]+$/
+
 const rules: FormRules = {
-  id: [{ required: true, message: () => t('plugin.messages.idRequired'), trigger: 'blur' }],
+  id: [
+    { required: true, message: () => t('plugin.messages.idRequired'), trigger: 'blur' },
+    {
+      pattern: pluginIdPattern,
+      message: () => t('plugin.messages.idInvalid'),
+      trigger: ['blur', 'change'],
+    },
+  ],
   name: [{ required: true, message: () => t('plugin.messages.nameRequired'), trigger: 'blur' }],
   url: [{ required: true, message: () => t('plugin.messages.urlRequired'), trigger: 'blur' }],
 }

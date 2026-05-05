@@ -86,6 +86,7 @@ export default {
     messages: {
       loadFailed: '加载插件列表失败',
       idRequired: '请输入插件ID',
+      idInvalid: '插件ID只能包含字母、数字和连字符',
       nameRequired: '请输入名称',
       urlRequired: '请输入URL',
       allowedHostOriginInvalid: '允许嵌入主站中存在无效 URL',
