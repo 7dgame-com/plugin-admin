@@ -8,12 +8,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { useAuthSession } from '../composables/useAuthSession'
+import { getRuntimeMode, getToken, requestParentTokenRefresh, setToken } from '../utils/token'
 
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
+const { fetchSession, isRootUser, hasManagerAccess } = useAuthSession()
 
 const isRootOnly = computed(() => route.query.reason === 'root')
 const isManagerOnly = computed(() => route.query.reason === 'manager')
@@ -31,6 +35,30 @@ const hint = computed(() =>
       ? t('auth.managerOnly')
       : t('layout.noPermission')
 )
+
+async function recoverAuthorizedSession() {
+  if (getRuntimeMode() === 'embedded' && !getToken()) {
+    const refreshed = await requestParentTokenRefresh()
+    if (refreshed?.accessToken) {
+      setToken(refreshed.accessToken)
+    }
+  }
+
+  if (!getToken()) return
+
+  await fetchSession(true)
+  if (isRootOnly.value && isRootUser.value) {
+    await router.replace('/plugins')
+  } else if (isManagerOnly.value && hasManagerAccess.value) {
+    await router.replace('/plugins')
+  }
+}
+
+onMounted(() => {
+  recoverAuthorizedSession().catch(() => {
+    // Keep the denial page visible when the session cannot be verified.
+  })
+})
 </script>
 
 <style scoped>
