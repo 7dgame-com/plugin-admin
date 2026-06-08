@@ -216,8 +216,21 @@ function getOrganizationLabel(organizationName: string | null) {
     return t('organization.publicOption')
   }
 
-  const organization = organizations.value.find((item) => item.name === organizationName)
+  const canonicalOrganizationName = resolveOrganizationName(organizationName)
+  const organization = organizations.value.find((item) => item.name === canonicalOrganizationName)
   return organization?.title || organizationName
+}
+
+function resolveOrganizationName(organizationName: string | null | undefined) {
+  const normalizedName = organizationName?.trim() ?? ''
+  if (!normalizedName) {
+    return ''
+  }
+
+  const organization = organizations.value.find((item) =>
+    item.name === normalizedName || item.title === normalizedName
+  )
+  return organization?.name ?? normalizedName
 }
 
 function getAccessScopeLabel(accessScope: PluginItem['access_scope']) {
@@ -363,7 +376,7 @@ function openEditDialog(row: PluginItem) {
     name: row.name,
     name_i18n: row.name_i18n ?? null,
     url: row.url,
-    organization_name: row.organization_name || '',
+    organization_name: resolveOrganizationName(row.organization_name),
     access_scope: row.access_scope || 'auth-only',
     icon: row.icon || '',
     enabled: !!row.enabled,
@@ -396,7 +409,7 @@ async function handleSubmit() {
         ...form,
         enabled: form.enabled ? 1 : 0,
         name_i18n: mergeNameI18nForLocale(form.name_i18n, locale.value, form.name),
-        organization_name: form.organization_name || null,
+        organization_name: resolveOrganizationName(form.organization_name) || null,
         allowed_host_origins: normalizeOriginList(form.allowed_host_origins),
       }
 

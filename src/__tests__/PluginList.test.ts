@@ -421,6 +421,61 @@ describe('PluginList', () => {
     expect(wrapper.text()).toContain('manager 或 root')
   })
 
+  it('normalizes legacy organization titles to organization names before saving', async () => {
+    getOrganizations.mockResolvedValue({
+      data: {
+        code: 0,
+        data: [
+          { id: 2, name: 'msc', title: '澳門科學館' },
+        ],
+      },
+    })
+    getPlugins.mockResolvedValue({
+      data: {
+        code: 0,
+        data: {
+          items: [
+            {
+              id: 'ai-3d-generator-v3',
+              name: 'AI 3D 生成器 V3',
+              url: 'https://a23.hxgxonline.com/',
+              organization_name: '澳門科學館',
+              access_scope: 'manager-only',
+              enabled: 1,
+              version: '1.0.0',
+              icon: null,
+              order: 0,
+              description: null,
+              allowed_origin: null,
+              allowed_host_origins: [],
+            },
+          ],
+          total: 1,
+        },
+      },
+    })
+
+    const wrapper = mountPluginList()
+
+    await flushPromises()
+    expect(wrapper.text()).toContain('澳門科學館')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '编辑')!
+      .trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '确定')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(updatePlugin).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'ai-3d-generator-v3',
+      organization_name: 'msc',
+    }))
+  })
+
   it('rejects plugin ids with spaces before sending a create request', async () => {
     const wrapper = mountPluginList()
 
