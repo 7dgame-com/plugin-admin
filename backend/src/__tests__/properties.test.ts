@@ -896,6 +896,7 @@ describe('property tests', () => {
             name: fieldString(1, 24),
             order: fc.integer({ min: -20, max: 20 }),
             enabled: fc.integer({ min: 0, max: 1 }),
+            useOrganizationTitle: fc.boolean(),
           }),
           { selector: (row) => row.id, maxLength: 6 }
         ),
@@ -925,7 +926,13 @@ describe('property tests', () => {
             createPluginRow(row.id, row.name, row.order, row.enabled, null)
           );
           const organizationPlugins = organizationPluginsInput.map((row) =>
-            createPluginRow(row.id, row.name, row.order, row.enabled, ORGANIZATION_NAME)
+            createPluginRow(
+              row.id,
+              row.name,
+              row.order,
+              row.enabled,
+              row.useOrganizationTitle ? ORGANIZATION_TITLE : ORGANIZATION_NAME
+            )
           );
 
           pluginPool.query.mockImplementation(async (sql: string, params: unknown[] = []) => {
@@ -933,10 +940,10 @@ describe('property tests', () => {
 
             if (
               normalized.startsWith(
-                'SELECT * FROM plugins WHERE enabled = 1 AND (organization_name IS NULL OR organization_name IN (?)) ORDER BY `order` ASC'
+                'SELECT * FROM plugins WHERE enabled = 1 AND (organization_name IS NULL OR organization_name IN (?, ?)) ORDER BY `order` ASC'
               )
             ) {
-              expect(params).toEqual([ORGANIZATION_NAME]);
+              expect(params).toEqual([ORGANIZATION_NAME, ORGANIZATION_TITLE]);
               return [sortByOrder([
                 ...publicPlugins.filter((plugin) => plugin.enabled === 1),
                 ...organizationPlugins.filter((plugin) => plugin.enabled === 1),
@@ -1031,8 +1038,11 @@ describe('property tests', () => {
             );
             expect(plugin.version).toBe(expected?.version ?? null);
             expect(plugin.order).toBe(expected?.order);
+            const expectedOrganizationName = expected?.organization_name === ORGANIZATION_TITLE
+              ? ORGANIZATION_NAME
+              : expected?.organization_name;
             expect(plugin.group).toBe(
-              expected?.organization_name ? `org:${expected.organization_name}` : 'org:public'
+              expectedOrganizationName ? `org:${expectedOrganizationName}` : 'org:public'
             );
           }
         }
