@@ -283,6 +283,65 @@ describe('public API routes', () => {
     });
   });
 
+  it('matches organization-scoped plugins saved with the organization title', async () => {
+    const app = createApp();
+
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        code: 0,
+        message: 'ok',
+        data: {
+          id: 1084,
+          username: 'mscadmin',
+          roles: ['manager', 'user'],
+          organizations: [{ id: 2, name: 'msc', title: '澳門科學館' }],
+        },
+      },
+    } as never);
+
+    pluginPool.query.mockResolvedValueOnce([
+      [
+        {
+          id: 'ai-3d-generator-v3',
+          name: 'AI 3D 生成器 V3',
+          name_i18n: '{"zh-TW":"AI 3D 生成器"}',
+          description: 'generator',
+          url: 'https://a23.plugins.xrugc.com/',
+          icon: 'MagicStick',
+          enabled: 1,
+          order: 1,
+          allowed_origin: null,
+          allowed_host_origins: null,
+          version: '1.0.0',
+          access_scope: 'manager-only',
+          organization_name: '澳門科學館',
+        },
+      ],
+    ]);
+
+    const response = await request(app)
+      .get('/api/v1/plugin/list')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    const [sql, params] = pluginPool.query.mock.calls[0] as [string, string[]];
+    const normalizedSql = sql.replace(/\s+/g, ' ').trim();
+    expect(normalizedSql).toContain('organization_name IN (?, ?)');
+    expect(params).toEqual(['msc', '澳門科學館']);
+    expect(response.body.menuGroups).toContainEqual({
+      id: 'org:msc',
+      name: '澳門科學館',
+      nameI18n: null,
+      icon: 'OfficeBuilding',
+      order: 1,
+    });
+    expect(response.body.plugins[0]).toMatchObject({
+      id: 'ai-3d-generator-v3',
+      group: 'org:msc',
+      accessScope: 'manager-only',
+    });
+  });
+
   it('verifies plugin list bearer tokens against their issuer host', async () => {
     const app = createApp();
 

@@ -74,6 +74,43 @@ function parseOrganizationSummaries(rawValue: unknown): UserOrganizationSummary[
   });
 }
 
+function buildOrganizationLookup(
+  organizations: UserOrganizationSummary[],
+): Map<string, UserOrganizationSummary> {
+  const lookup = new Map<string, UserOrganizationSummary>();
+
+  for (const organization of organizations) {
+    lookup.set(organization.name, organization);
+
+    if (organization.title.trim() !== '') {
+      lookup.set(organization.title, organization);
+    }
+  }
+
+  return lookup;
+}
+
+function collectOrganizationVisibilityKeys(
+  organizations: UserOrganizationSummary[],
+): string[] {
+  const keys = new Set<string>();
+
+  for (const organization of organizations) {
+    const name = organization.name.trim();
+    const title = organization.title.trim();
+
+    if (name.length > 0) {
+      keys.add(name);
+    }
+
+    if (title.length > 0) {
+      keys.add(title);
+    }
+  }
+
+  return Array.from(keys);
+}
+
 async function fetchOrganizationSummaries(
   token: string,
   req: Request,
@@ -179,13 +216,8 @@ export async function list(req: Request, res: Response): Promise<void> {
 
   try {
     const hasOrganizationNameColumn = await hasPluginOrganizationNameColumn();
-    const organizationNames = Array.from(
-      new Set(
-        organizations
-          .map((organization) => organization.name.trim())
-          .filter((name) => name.length > 0)
-      )
-    );
+    const organizationLookup = buildOrganizationLookup(organizations);
+    const organizationVisibilityKeys = collectOrganizationVisibilityKeys(organizations);
     const isRootUser = roles.includes('root');
     let plugins: PluginRow[];
 
@@ -198,16 +230,16 @@ export async function list(req: Request, res: Response): Promise<void> {
           ORDER BY \`order\` ASC
         `
       );
-    } else if (hasOrganizationNameColumn && organizationNames.length > 0) {
+    } else if (hasOrganizationNameColumn && organizationVisibilityKeys.length > 0) {
       [plugins] = await pluginPool.query<PluginRow[]>(
         `
           SELECT *
           FROM plugins
           WHERE enabled = 1
-            AND (organization_name IS NULL OR organization_name IN (${organizationNames.map(() => '?').join(', ')}))
+            AND (organization_name IS NULL OR organization_name IN (${organizationVisibilityKeys.map(() => '?').join(', ')}))
           ORDER BY \`order\` ASC
         `,
-        organizationNames
+        organizationVisibilityKeys
       );
     } else if (hasOrganizationNameColumn) {
       [plugins] = await pluginPool.query<PluginRow[]>(
@@ -234,7 +266,10 @@ export async function list(req: Request, res: Response): Promise<void> {
       ? Array.from(
           new Set(
             plugins
-              .map((plugin) => plugin.organization_name?.trim() ?? '')
+              .map((plugin) => {
+                const organizationName = plugin.organization_name?.trim() ?? '';
+                return organizationLookup.get(organizationName)?.name ?? organizationName;
+              })
               .filter((name) => name.length > 0)
           )
         )
@@ -273,6 +308,7 @@ export async function list(req: Request, res: Response): Promise<void> {
     ];
     const serializedPlugins = plugins.map((plugin) => {
       const organizationName = plugin.organization_name?.trim() ?? '';
+      const canonicalOrganizationName = organizationLookup.get(organizationName)?.name ?? organizationName;
 
       return {
         id: plugin.id,
@@ -281,8 +317,8 @@ export async function list(req: Request, res: Response): Promise<void> {
         description: plugin.description,
         url: plugin.url,
         icon: plugin.icon,
-        group: hasOrganizationNameColumn && organizationName
-          ? `org:${organizationName}`
+        group: hasOrganizationNameColumn && canonicalOrganizationName
+          ? `org:${canonicalOrganizationName}`
           : 'org:public',
         enabled: Boolean(plugin.enabled),
         order: Number(plugin.order),
