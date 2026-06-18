@@ -16,13 +16,15 @@ describe('docker entrypoint nginx generation', () => {
     expect(entrypoint).toContain('APP_RESOLVER:-127.0.0.11')
   })
 
-  it('generates both main-platform /api and system-admin /backend upstream blocks', () => {
+  it('generates main-platform, identity, and system-admin upstream blocks', () => {
     expect(entrypoint).toContain('generate_lb_config "APP_API" "/api/" "api"')
+    expect(entrypoint).toContain('generate_lb_config "APP_AUTH" "/api-auth/" "auth"')
     expect(entrypoint).toContain('generate_lb_config "APP_BACKEND" "/backend/" "backend"')
+    expect(entrypoint).toContain('APP_AUTH_${i}_URL')
   })
 
   it('formats debug-env JSON with a conditional upstream comma', () => {
-    expect(entrypoint).toContain('DEBUG_LIST="${API_LIST}${API_LIST:+, }${BACKEND_LIST}"')
+    expect(entrypoint).toContain('DEBUG_LIST="${API_LIST}${API_LIST:+, }${AUTH_LIST}${AUTH_LIST:+, }${BACKEND_LIST}"')
     expect(entrypoint).toContain('${DEBUG_LIST}${DEBUG_LIST:+, }')
     expect(entrypoint).not.toContain('${API_LIST}${API_LIST:+, }${BACKEND_LIST},')
   })
