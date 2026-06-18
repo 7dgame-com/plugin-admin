@@ -12,6 +12,8 @@ set -e
 #   APP_API_2_WEIGHT=30
 #   APP_API_3_URL=https://api.third.com
 #   APP_API_3_WEIGHT=10
+#   APP_AUTH_1_URL=https://identity.xrteeth.com
+#   APP_AUTH_2_URL=https://identity.tmrpp.com
 #   APP_BACKEND_1_URL=http://system-admin-backend:8088
 #   APP_BACKEND_1_WEIGHT=100                  （可选）
 #   APP_RESOLVER=127.0.0.11 8.8.8.8           （可选，DNS 解析服务器）
@@ -19,6 +21,7 @@ set -e
 # 生成负载均衡 + failover：
 #   split_clients 按权重分流 → map 映射后端 URL/Host
 #   /api/        → 加权分流到 APP_API_N → failover 到环形下一个
+#   /api-auth/   → 加权分流到 APP_AUTH_N → failover 到环形下一个
 #   /backend/    → 加权分流到 APP_BACKEND_N → failover 到环形下一个
 # ============================================================
 
@@ -290,17 +293,21 @@ map \$${PREFIX_NAME}_pool \$${PREFIX_NAME}_fb_host {"
 generate_lb_config "APP_API" "/api/" "api"
 API_LOCATIONS="$CHAIN_RESULT"
 
-# --- 2. 生成 backend 负载均衡配置 ---
+# --- 2. 生成 Identity API 负载均衡配置 ---
+generate_lb_config "APP_AUTH" "/api-auth/" "auth"
+AUTH_LOCATIONS="$CHAIN_RESULT"
+
+# --- 3. 生成 backend 负载均衡配置 ---
 generate_lb_config "APP_BACKEND" "/backend/" "backend"
 BACKEND_LOCATIONS="$CHAIN_RESULT"
 
-# --- 3. 生成 resolver 配置 ---
+# --- 4. 生成 resolver 配置 ---
 RESOLVER_SERVERS="${APP_RESOLVER:-127.0.0.11}"
 RESOLVER_BLOCK="resolver ${RESOLVER_SERVERS} valid=300s ipv6=off;
 resolver_timeout 10s;"
 echo "[entrypoint] DNS resolver: ${RESOLVER_SERVERS} (valid=300s)"
 
-# --- 4. 复制模板并注入动态配置 ---
+# --- 5. 复制模板并注入动态配置 ---
 cp "$TEMPLATE" "$OUTPUT"
 
 inject_locations() {
@@ -327,12 +334,12 @@ inject_locations "# __RESOLVER__" "$RESOLVER_BLOCK"
 inject_locations "# __LB_HTTP_BLOCK__" "$LB_HTTP_BLOCK"
 
 # 注入 server 层级配置（location 块）
-inject_locations "# __API_LOCATIONS__" "$API_LOCATIONS"
+inject_locations "# __API_LOCATIONS__" "${API_LOCATIONS}${AUTH_LOCATIONS}"
 inject_locations "# __BACKEND_LOCATIONS__" "$BACKEND_LOCATIONS"
 
 echo "[entrypoint] Nginx config generated at $OUTPUT"
 
-# --- 5. 生成调试信息 ---
+# --- 6. 生成调试信息 ---
 API_LIST=""
 i=1
 while true; do
@@ -340,6 +347,15 @@ while true; do
   [ -z "$url" ] && break
   [ -n "$API_LIST" ] && API_LIST="${API_LIST}, "
   API_LIST="${API_LIST}\"APP_API_${i}_URL\": \"${url}\""
+  i=$((i + 1))
+done
+AUTH_LIST=""
+i=1
+while true; do
+  eval "url=\${APP_AUTH_${i}_URL}"
+  [ -z "$url" ] && break
+  [ -n "$AUTH_LIST" ] && AUTH_LIST="${AUTH_LIST}, "
+  AUTH_LIST="${AUTH_LIST}\"APP_AUTH_${i}_URL\": \"${url}\""
   i=$((i + 1))
 done
 BACKEND_LIST=""
@@ -351,7 +367,7 @@ while true; do
   BACKEND_LIST="${BACKEND_LIST}\"APP_BACKEND_${i}_URL\": \"${url}\""
   i=$((i + 1))
 done
-DEBUG_LIST="${API_LIST}${API_LIST:+, }${BACKEND_LIST}"
+DEBUG_LIST="${API_LIST}${API_LIST:+, }${AUTH_LIST}${AUTH_LIST:+, }${BACKEND_LIST}"
 cat > /usr/share/nginx/html/debug-env.json <<EOF
 {
   ${DEBUG_LIST}${DEBUG_LIST:+, }
@@ -360,5 +376,5 @@ cat > /usr/share/nginx/html/debug-env.json <<EOF
 }
 EOF
 
-# --- 6. 启动 nginx ---
+# --- 7. 启动 nginx ---
 exec nginx -g 'daemon off;'
