@@ -211,6 +211,11 @@ describe('public API routes', () => {
           allowedHostOrigins: [],
           accessScope: 'manager-only',
           version: '1.0.0',
+          extraConfig: {
+            organizationId: 2,
+            organizationName: 'acme',
+            organizationTitle: 'Acme Studio',
+          },
         },
       ],
     });
@@ -339,6 +344,11 @@ describe('public API routes', () => {
       id: 'ai-3d-generator-v3',
       group: 'org:msc',
       accessScope: 'manager-only',
+      extraConfig: {
+        organizationId: 2,
+        organizationName: 'msc',
+        organizationTitle: '澳門科學館',
+      },
     });
   });
 
@@ -503,6 +513,11 @@ describe('public API routes', () => {
           allowedHostOrigins: [],
           accessScope: 'root-only',
           version: '1.0.0',
+          extraConfig: {
+            organizationId: 9,
+            organizationName: 'north',
+            organizationTitle: 'North Studio',
+          },
         },
       ],
     });
@@ -571,6 +586,14 @@ describe('public API routes', () => {
       icon: 'OfficeBuilding',
       order: 1,
     });
+    expect(response.body.plugins[0]).toMatchObject({
+      group: 'org:msc',
+      extraConfig: {
+        organizationId: 8,
+        organizationName: 'msc',
+        organizationTitle: '澳門科學館',
+      },
+    });
   });
 
   it('refreshes organization titles when token organizations only expose the organization name', async () => {
@@ -636,6 +659,14 @@ describe('public API routes', () => {
       icon: 'OfficeBuilding',
       order: 1,
     });
+    expect(response.body.plugins[0]).toMatchObject({
+      group: 'org:test',
+      extraConfig: {
+        organizationId: 33,
+        organizationName: 'test',
+        organizationTitle: '托尔斯泰',
+      },
+    });
   });
 
   it('falls back to organization names for root-visible plugin groups when the main organization list has no matching title', async () => {
@@ -693,6 +724,12 @@ describe('public API routes', () => {
       nameI18n: null,
       icon: 'OfficeBuilding',
       order: 1,
+    });
+    expect(response.body.plugins[0]).toMatchObject({
+      group: 'org:msc',
+      extraConfig: {
+        organizationName: 'msc',
+      },
     });
   });
 
