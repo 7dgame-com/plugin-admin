@@ -81,10 +81,6 @@ function buildOrganizationLookup(
 
   for (const organization of organizations) {
     lookup.set(organization.name, organization);
-
-    if (organization.title.trim() !== '') {
-      lookup.set(organization.title, organization);
-    }
   }
 
   return lookup;
@@ -97,14 +93,9 @@ function collectOrganizationVisibilityKeys(
 
   for (const organization of organizations) {
     const name = organization.name.trim();
-    const title = organization.title.trim();
 
     if (name.length > 0) {
       keys.add(name);
-    }
-
-    if (title.length > 0) {
-      keys.add(title);
     }
   }
 

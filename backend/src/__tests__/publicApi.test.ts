@@ -283,7 +283,7 @@ describe('public API routes', () => {
     });
   });
 
-  it('matches organization-scoped plugins saved with the organization title', async () => {
+  it('matches organization-scoped plugins saved with the organization name', async () => {
     const app = createApp();
 
     mockedAxios.get.mockResolvedValueOnce({
@@ -314,7 +314,7 @@ describe('public API routes', () => {
           allowed_host_origins: null,
           version: '1.0.0',
           access_scope: 'manager-only',
-          organization_name: '澳門科學館',
+          organization_name: 'msc',
         },
       ],
     ]);
@@ -326,8 +326,8 @@ describe('public API routes', () => {
     expect(response.status).toBe(200);
     const [sql, params] = pluginPool.query.mock.calls[0] as [string, string[]];
     const normalizedSql = sql.replace(/\s+/g, ' ').trim();
-    expect(normalizedSql).toContain('organization_name IN (?, ?)');
-    expect(params).toEqual(['msc', '澳門科學館']);
+    expect(normalizedSql).toContain('organization_name IN (?)');
+    expect(params).toEqual(['msc']);
     expect(response.body.menuGroups).toContainEqual({
       id: 'org:msc',
       name: '澳門科學館',

@@ -227,9 +227,7 @@ function resolveOrganizationName(organizationName: string | null | undefined) {
     return ''
   }
 
-  const organization = organizations.value.find((item) =>
-    item.name === normalizedName || item.title === normalizedName
-  )
+  const organization = organizations.value.find((item) => item.name === normalizedName)
   return organization?.name ?? normalizedName
 }
 
