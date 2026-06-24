@@ -418,7 +418,7 @@ describe('PluginList', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('manager 或 root')
+    expect(wrapper.text()).toContain('root + admin + manager')
   })
 
   it('displays organization titles while saving organization names', async () => {

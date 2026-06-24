@@ -83,10 +83,10 @@
             :placeholder="t('plugin.accessScopePlaceholder')"
             style="width: 100%"
           >
-            <el-option :label="t('plugin.accessScopes.authOnly')" value="auth-only" />
+            <el-option :label="t('plugin.accessScopes.rootOnly')" value="root-only" />
             <el-option :label="t('plugin.accessScopes.adminOnly')" value="admin-only" />
             <el-option :label="t('plugin.accessScopes.managerOnly')" value="manager-only" />
-            <el-option :label="t('plugin.accessScopes.rootOnly')" value="root-only" />
+            <el-option :label="t('plugin.accessScopes.authOnly')" value="auth-only" />
           </el-select>
         </el-form-item>
         <el-form-item :label="t('common.icon')">
