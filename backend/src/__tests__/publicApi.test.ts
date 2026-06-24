@@ -211,6 +211,11 @@ describe('public API routes', () => {
           allowedHostOrigins: [],
           accessScope: 'manager-only',
           version: '1.0.0',
+          extraConfig: {
+            organizationId: 2,
+            organizationName: 'acme',
+            organizationTitle: 'Acme Studio',
+          },
         },
       ],
     });
@@ -283,7 +288,7 @@ describe('public API routes', () => {
     });
   });
 
-  it('matches organization-scoped plugins saved with the organization title', async () => {
+  it('matches organization-scoped plugins saved with the organization name', async () => {
     const app = createApp();
 
     mockedAxios.get.mockResolvedValueOnce({
@@ -314,7 +319,7 @@ describe('public API routes', () => {
           allowed_host_origins: null,
           version: '1.0.0',
           access_scope: 'manager-only',
-          organization_name: '澳門科學館',
+          organization_name: 'msc',
         },
       ],
     ]);
@@ -326,8 +331,8 @@ describe('public API routes', () => {
     expect(response.status).toBe(200);
     const [sql, params] = pluginPool.query.mock.calls[0] as [string, string[]];
     const normalizedSql = sql.replace(/\s+/g, ' ').trim();
-    expect(normalizedSql).toContain('organization_name IN (?, ?)');
-    expect(params).toEqual(['msc', '澳門科學館']);
+    expect(normalizedSql).toContain('organization_name IN (?)');
+    expect(params).toEqual(['msc']);
     expect(response.body.menuGroups).toContainEqual({
       id: 'org:msc',
       name: '澳門科學館',
@@ -339,6 +344,11 @@ describe('public API routes', () => {
       id: 'ai-3d-generator-v3',
       group: 'org:msc',
       accessScope: 'manager-only',
+      extraConfig: {
+        organizationId: 2,
+        organizationName: 'msc',
+        organizationTitle: '澳門科學館',
+      },
     });
   });
 
@@ -503,6 +513,11 @@ describe('public API routes', () => {
           allowedHostOrigins: [],
           accessScope: 'root-only',
           version: '1.0.0',
+          extraConfig: {
+            organizationId: 9,
+            organizationName: 'north',
+            organizationTitle: 'North Studio',
+          },
         },
       ],
     });
@@ -571,6 +586,14 @@ describe('public API routes', () => {
       icon: 'OfficeBuilding',
       order: 1,
     });
+    expect(response.body.plugins[0]).toMatchObject({
+      group: 'org:msc',
+      extraConfig: {
+        organizationId: 8,
+        organizationName: 'msc',
+        organizationTitle: '澳門科學館',
+      },
+    });
   });
 
   it('refreshes organization titles when token organizations only expose the organization name', async () => {
@@ -636,6 +659,14 @@ describe('public API routes', () => {
       icon: 'OfficeBuilding',
       order: 1,
     });
+    expect(response.body.plugins[0]).toMatchObject({
+      group: 'org:test',
+      extraConfig: {
+        organizationId: 33,
+        organizationName: 'test',
+        organizationTitle: '托尔斯泰',
+      },
+    });
   });
 
   it('falls back to organization names for root-visible plugin groups when the main organization list has no matching title', async () => {
@@ -693,6 +724,12 @@ describe('public API routes', () => {
       nameI18n: null,
       icon: 'OfficeBuilding',
       order: 1,
+    });
+    expect(response.body.plugins[0]).toMatchObject({
+      group: 'org:msc',
+      extraConfig: {
+        organizationName: 'msc',
+      },
     });
   });
 
