@@ -81,10 +81,6 @@ function buildOrganizationLookup(
 
   for (const organization of organizations) {
     lookup.set(organization.name, organization);
-
-    if (organization.title.trim() !== '') {
-      lookup.set(organization.title, organization);
-    }
   }
 
   return lookup;
@@ -97,18 +93,19 @@ function collectOrganizationVisibilityKeys(
 
   for (const organization of organizations) {
     const name = organization.name.trim();
-    const title = organization.title.trim();
 
     if (name.length > 0) {
       keys.add(name);
     }
-
-    if (title.length > 0) {
-      keys.add(title);
-    }
   }
 
   return Array.from(keys);
+}
+
+function buildOrganizationSummaryMap(
+  organizations: UserOrganizationSummary[],
+): Map<string, UserOrganizationSummary> {
+  return new Map(organizations.map((organization) => [organization.name, organization]));
 }
 
 async function fetchOrganizationSummaries(
@@ -274,18 +271,17 @@ export async function list(req: Request, res: Response): Promise<void> {
           )
         )
       : [];
-    const organizationTitleMap = new Map(
-      organizations.map((organization) => [organization.name, organization.title])
-    );
-    const missingOrganizationTitles = pluginOrganizationNames.filter((name) => {
-      const title = organizationTitleMap.get(name)?.trim();
-      return title === undefined || title === '' || title === name;
+    const organizationSummaryMap = buildOrganizationSummaryMap(organizations);
+    const missingOrganizationSummaries = pluginOrganizationNames.filter((name) => {
+      const summary = organizationSummaryMap.get(name);
+      const title = summary?.title.trim();
+      return summary === undefined || title === undefined || title === '' || title === name;
     });
 
-    if (verifiedBearerToken !== null && missingOrganizationTitles.length > 0) {
-      for (const organization of await fetchOrganizationSummaries(verifiedBearerToken, req, missingOrganizationTitles)) {
-        if (missingOrganizationTitles.includes(organization.name)) {
-          organizationTitleMap.set(organization.name, organization.title);
+    if (verifiedBearerToken !== null && missingOrganizationSummaries.length > 0) {
+      for (const organization of await fetchOrganizationSummaries(verifiedBearerToken, req, missingOrganizationSummaries)) {
+        if (missingOrganizationSummaries.includes(organization.name)) {
+          organizationSummaryMap.set(organization.name, organization);
         }
       }
     }
@@ -300,7 +296,7 @@ export async function list(req: Request, res: Response): Promise<void> {
       },
       ...pluginOrganizationNames.map((name, index) => ({
         id: `org:${name}`,
-        name: organizationTitleMap.get(name) ?? name,
+        name: organizationSummaryMap.get(name)?.title ?? name,
         nameI18n: null,
         icon: 'OfficeBuilding',
         order: index + 1,
@@ -309,6 +305,9 @@ export async function list(req: Request, res: Response): Promise<void> {
     const serializedPlugins = plugins.map((plugin) => {
       const organizationName = plugin.organization_name?.trim() ?? '';
       const canonicalOrganizationName = organizationLookup.get(organizationName)?.name ?? organizationName;
+      const organizationSummary = canonicalOrganizationName
+        ? organizationSummaryMap.get(canonicalOrganizationName)
+        : undefined;
 
       return {
         id: plugin.id,
@@ -326,6 +325,17 @@ export async function list(req: Request, res: Response): Promise<void> {
         allowedHostOrigins: normalizeOriginList(plugin.allowed_host_origins).origins,
         accessScope: normalizeAccessScope(plugin.access_scope),
         version: plugin.version,
+        extraConfig: canonicalOrganizationName
+          ? {
+              organizationName: canonicalOrganizationName,
+              ...(organizationSummary
+                ? {
+                    organizationId: organizationSummary.id,
+                    organizationTitle: organizationSummary.title,
+                  }
+                : {}),
+            }
+          : undefined,
       };
     });
 

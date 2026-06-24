@@ -418,10 +418,10 @@ describe('PluginList', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('manager 或 root')
+    expect(wrapper.text()).toContain('root + admin + manager')
   })
 
-  it('normalizes legacy organization titles to organization names before saving', async () => {
+  it('displays organization titles while saving organization names', async () => {
     getOrganizations.mockResolvedValue({
       data: {
         code: 0,
@@ -439,7 +439,7 @@ describe('PluginList', () => {
               id: 'ai-3d-generator-v3',
               name: 'AI 3D 生成器 V3',
               url: 'https://a23.hxgxonline.com/',
-              organization_name: '澳門科學館',
+              organization_name: 'msc',
               access_scope: 'manager-only',
               enabled: 1,
               version: '1.0.0',

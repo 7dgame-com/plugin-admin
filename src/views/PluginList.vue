@@ -6,8 +6,8 @@
 
     <el-card>
       <el-table :data="tableData" v-loading="loading" stripe>
-        <el-table-column prop="id" :label="t('common.id')" width="160" />
-        <el-table-column prop="name" :label="t('common.name')" min-width="120" />
+        <el-table-column prop="id" :label="t('plugin.pluginId')" width="160" />
+        <el-table-column prop="name" :label="t('plugin.displayName')" min-width="120" />
         <el-table-column prop="url" :label="t('common.url')" min-width="200" show-overflow-tooltip />
         <el-table-column :label="t('organization.binding')" min-width="180">
           <template #default="{ row }">
@@ -55,7 +55,7 @@
         <el-form-item :label="t('plugin.pluginId')" prop="id">
           <el-input v-model="form.id" :placeholder="t('plugin.pluginIdPlaceholder')" :disabled="!!editingId" />
         </el-form-item>
-        <el-form-item :label="t('common.name')" prop="name">
+        <el-form-item :label="t('plugin.displayName')" prop="name">
           <el-input v-model="form.name" :placeholder="t('plugin.namePlaceholder')" />
         </el-form-item>
         <el-form-item :label="t('common.url')" prop="url">
@@ -83,10 +83,10 @@
             :placeholder="t('plugin.accessScopePlaceholder')"
             style="width: 100%"
           >
-            <el-option :label="t('plugin.accessScopes.authOnly')" value="auth-only" />
+            <el-option :label="t('plugin.accessScopes.rootOnly')" value="root-only" />
             <el-option :label="t('plugin.accessScopes.adminOnly')" value="admin-only" />
             <el-option :label="t('plugin.accessScopes.managerOnly')" value="manager-only" />
-            <el-option :label="t('plugin.accessScopes.rootOnly')" value="root-only" />
+            <el-option :label="t('plugin.accessScopes.authOnly')" value="auth-only" />
           </el-select>
         </el-form-item>
         <el-form-item :label="t('common.icon')">
@@ -207,7 +207,7 @@ const rules: FormRules = {
       trigger: ['blur', 'change'],
     },
   ],
-  name: [{ required: true, message: () => t('plugin.messages.nameRequired'), trigger: 'blur' }],
+  name: [{ required: true, message: () => t('plugin.messages.displayNameRequired'), trigger: 'blur' }],
   url: [{ required: true, message: () => t('plugin.messages.urlRequired'), trigger: 'blur' }],
 }
 
@@ -227,9 +227,7 @@ function resolveOrganizationName(organizationName: string | null | undefined) {
     return ''
   }
 
-  const organization = organizations.value.find((item) =>
-    item.name === normalizedName || item.title === normalizedName
-  )
+  const organization = organizations.value.find((item) => item.name === normalizedName)
   return organization?.name ?? normalizedName
 }
 
