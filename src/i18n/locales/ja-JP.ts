@@ -59,6 +59,7 @@ export default {
     addTitle: 'プラグインを追加',
     editTitle: 'プラグインを編集',
     pluginId: 'プラグイン ID',
+    displayName: 'プラグイン表示名',
     allowedOrigin: '許可オリジン',
     pluginOrigin: 'プラグイン Origin',
     pluginOriginPlaceholder: 'URL から自動計算',
@@ -86,7 +87,7 @@ export default {
     messages: {
       loadFailed: 'プラグイン一覧の読み込みに失敗しました',
       idRequired: 'プラグイン ID を入力してください',
-      nameRequired: '名称を入力してください',
+      displayNameRequired: 'プラグイン表示名を入力してください',
       urlRequired: 'URL を入力してください',
       allowedHostOriginInvalid: '許可するホスト Origin に無効な URL が含まれています',
     },

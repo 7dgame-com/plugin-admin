@@ -59,6 +59,7 @@ export default {
     addTitle: '新增外掛',
     editTitle: '編輯外掛',
     pluginId: '外掛 ID',
+    displayName: '外掛顯示名稱',
     allowedOrigin: '允許來源',
     pluginOrigin: '外掛 Origin',
     pluginOriginPlaceholder: '根據 URL 自動產生',
@@ -86,7 +87,7 @@ export default {
     messages: {
       loadFailed: '載入外掛列表失敗',
       idRequired: '請輸入外掛 ID',
-      nameRequired: '請輸入名稱',
+      displayNameRequired: '請輸入外掛顯示名稱',
       urlRequired: '請輸入 URL',
       allowedHostOriginInvalid: '允許嵌入主站中存在無效 URL',
     },

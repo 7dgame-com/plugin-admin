@@ -59,6 +59,7 @@ export default {
     addTitle: 'เพิ่มปลั๊กอิน',
     editTitle: 'แก้ไขปลั๊กอิน',
     pluginId: 'รหัสปลั๊กอิน',
+    displayName: 'ชื่อแสดงผลของปลั๊กอิน',
     allowedOrigin: 'ต้นทางที่อนุญาต',
     pluginOrigin: 'Plugin Origin',
     pluginOriginPlaceholder: 'คำนวณจาก URL อัตโนมัติ',
@@ -86,7 +87,7 @@ export default {
     messages: {
       loadFailed: 'โหลดรายการปลั๊กอินไม่สำเร็จ',
       idRequired: 'กรุณากรอกรหัสปลั๊กอิน',
-      nameRequired: 'กรุณากรอกชื่อ',
+      displayNameRequired: 'กรุณากรอกชื่อแสดงผลของปลั๊กอิน',
       urlRequired: 'กรุณากรอก URL',
       allowedHostOriginInvalid: 'มี URL ที่ไม่ถูกต้องในรายการต้นทางโฮสต์ที่อนุญาต',
     },
