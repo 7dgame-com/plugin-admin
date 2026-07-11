@@ -7,6 +7,20 @@ jest.mock('../db/pluginDb', () => ({
 }));
 
 jest.mock('axios');
+jest.mock('../middleware/auth', () => ({
+  auth: (
+    req: { headers: { authorization?: string }; user?: { userId: number; roles: string[] } },
+    res: { status: (status: number) => { json: (body: unknown) => void } },
+    next: () => void,
+  ) => {
+    if (req.headers.authorization !== 'Bearer root-test-token') {
+      res.status(401).json({ code: 1001, message: 'Token 无效或已过期' });
+      return;
+    }
+    req.user = { userId: 1, roles: ['root'] };
+    next();
+  },
+}));
 
 import axios from 'axios';
 import request from 'supertest';
@@ -45,6 +59,12 @@ describe('diagnostics route', () => {
     process.env = originalEnv;
   });
 
+  it('rejects unauthenticated diagnostics requests', async () => {
+    const response = await request(createApp()).get('/diagnostics');
+
+    expect(response.status).toBe(401);
+  });
+
   it('returns aggregated diagnostics when upstreams are reachable', async () => {
     mockedAxios.get
       .mockResolvedValueOnce({
@@ -60,7 +80,9 @@ describe('diagnostics route', () => {
         },
       });
 
-    const response = await request(createApp()).get('/diagnostics');
+    const response = await request(createApp())
+      .get('/diagnostics')
+      .set('Authorization', 'Bearer root-test-token');
 
     expect(response.status).toBe(200);
     expect(response.body.code).toBe(0);
@@ -115,7 +137,9 @@ describe('diagnostics route', () => {
       });
     probePluginDb.mockRejectedValueOnce(new Error('db down'));
 
-    const response = await request(createApp()).get('/diagnostics');
+    const response = await request(createApp())
+      .get('/diagnostics')
+      .set('Authorization', 'Bearer root-test-token');
 
     expect(response.status).toBe(200);
     expect(response.body.data.status).toBe('error');
@@ -132,7 +156,9 @@ describe('diagnostics route', () => {
       .mockRejectedValueOnce(new Error('invalid url'))
       .mockRejectedValueOnce(new Error('invalid url'));
 
-    const response = await request(createApp()).get('/diagnostics');
+    const response = await request(createApp())
+      .get('/diagnostics')
+      .set('Authorization', 'Bearer root-test-token');
 
     expect(response.status).toBe(200);
     expect(response.body.data.status).toBe('error');
