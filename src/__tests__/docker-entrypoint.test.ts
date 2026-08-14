@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const entrypoint = readFileSync(resolve(process.cwd(), 'docker-entrypoint.sh'), 'utf8')
+const nginxTemplate = readFileSync(resolve(process.cwd(), 'nginx.conf.template'), 'utf8')
 
 describe('docker entrypoint nginx generation', () => {
   it('uses direct upstreams for single-backend proxies', () => {
@@ -20,12 +21,15 @@ describe('docker entrypoint nginx generation', () => {
     expect(entrypoint).toContain('generate_lb_config "APP_API" "/api/" "api"')
     expect(entrypoint).toContain('generate_lb_config "APP_AUTH" "/api-auth/" "auth"')
     expect(entrypoint).toContain('generate_lb_config "APP_BACKEND" "/backend/" "backend"')
-    expect(entrypoint).toContain('APP_AUTH_${i}_URL')
+    expect(entrypoint).toContain('${ENV_PREFIX}_${i}_URL')
   })
 
-  it('formats debug-env JSON with a conditional upstream comma', () => {
-    expect(entrypoint).toContain('DEBUG_LIST="${API_LIST}${API_LIST:+, }${AUTH_LIST}${AUTH_LIST:+, }${BACKEND_LIST}"')
-    expect(entrypoint).toContain('${DEBUG_LIST}${DEBUG_LIST:+, }')
-    expect(entrypoint).not.toContain('${API_LIST}${API_LIST:+, }${BACKEND_LIST},')
+  it('does not generate a runtime topology debug file', () => {
+    expect(entrypoint).not.toContain('DEBUG_LIST=')
+    expect(entrypoint).toContain('rm -f /usr/share/nginx/html/debug-env.json')
+    expect(nginxTemplate).toMatch(/location = \/debug-env \{[\s\S]*?return 404;/)
+    expect(nginxTemplate).toMatch(/location = \/debug-env\.json \{[\s\S]*?return 404;/)
+    expect(nginxTemplate).toMatch(/location = \/api-diagnostics \{[\s\S]*?return 404;/)
+    expect(nginxTemplate).toMatch(/location = \/api-diagnostics\/ \{[\s\S]*?return 404;/)
   })
 })
