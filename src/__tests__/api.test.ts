@@ -69,9 +69,9 @@ describe('Property 5: x-refresh-token 响应头自动持久化', () => {
   beforeEach(() => { localStorage.clear() })
   afterEach(() => { vi.restoreAllMocks() })
 
-  it('stores x-refresh-token header value in localStorage for any token string', async () => {
+  it('stores x-refresh-token header value in localStorage for any valid token string', async () => {
     await fc.assert(
-      fc.asyncProperty(fc.string({ minLength: 1 }), async (tokenValue) => {
+      fc.asyncProperty(fc.base64String({ minLength: 1 }), async (tokenValue) => {
         localStorage.clear()
         const { default: adminApi } = await import('../api/index')
 

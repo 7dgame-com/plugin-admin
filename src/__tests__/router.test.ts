@@ -41,7 +41,7 @@ vi.mock('../layout/AppLayout.vue', () => ({ default: { template: '<div><router-v
 vi.mock('../views/PluginList.vue', () => ({ default: { template: '<div>PluginList</div>' } }))
 vi.mock('../views/OrganizationList.vue', () => ({ default: { template: '<div>OrganizationList</div>' } }))
 
-import router from '../router/index'
+import router, { shouldRegisterDiagnostics } from '../router/index'
 
 describe('router auth guards', () => {
   beforeEach(async () => {
@@ -63,6 +63,10 @@ describe('router auth guards', () => {
   it('allows /login as a public route', async () => {
     await router.push('/login')
     expect(router.currentRoute.value.name).toBe('Login')
+  })
+
+  it('does not register diagnostics in Production', () => {
+    expect(shouldRegisterDiagnostics(true)).toBe(false)
   })
 
   it('redirects standalone unauthenticated requests to /login with a redirect query', async () => {

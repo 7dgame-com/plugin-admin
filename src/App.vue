@@ -33,8 +33,7 @@ const route = useRoute()
 const hasToken = ref(!!getToken())
 const inIframe = ref(isInIframe())
 
-const PUBLIC_ROUTES = ['/api-diagnostics', '/login', '/not-allowed']
-const isPublicRoute = computed(() => PUBLIC_ROUTES.some((p) => route.path.startsWith(p)))
+const isPublicRoute = computed(() => route.meta.public === true)
 const showHandshake = computed(() => !isPublicRoute.value && inIframe.value && !hasToken.value)
 
 usePluginMessageBridge({
