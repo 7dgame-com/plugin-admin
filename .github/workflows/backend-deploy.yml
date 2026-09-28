@@ -13,8 +13,13 @@ env:
   IMAGE: hkccr.ccs.tencentyun.com/plugins/system-admin-backend
 
 jobs:
+  validate:
+    name: Validate Backend
+    uses: ./.github/workflows/backend-ci.yml
+
   build-and-push:
     name: Build & Push Backend Docker Image
+    needs: validate
     runs-on: ubuntu-latest
     permissions:
       contents: read

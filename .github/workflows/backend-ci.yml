@@ -1,12 +1,7 @@
 name: Backend CI
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "backend/**"
-      - ".github/workflows/backend-ci.yml"
-      - ".github/workflows/backend-deploy.yml"
+  workflow_call:
   pull_request:
     branches: [main]
     paths:
@@ -26,7 +21,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
