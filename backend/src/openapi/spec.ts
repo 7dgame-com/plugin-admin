@@ -205,6 +205,20 @@ export const openApiDocument = {
         },
       },
     },
+    '/api/v1/plugin/access-config/{id}': {
+      get: {
+        tags: ['Public Plugin API'],
+        summary: 'Read current strict plugin access policy for a trusted backend',
+        description: 'Returns policy metadata only for public plugins (organization_name IS NULL). Does not authenticate or call back into the consuming backend. Reads the authority on every request and returns Cache-Control: no-store. The consuming backend must authenticate and authorize the current user independently. Missing or invalid scope never falls back to auth-only.',
+        parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': okResponse('Current plugin policy metadata', '#/components/schemas/PluginAccessConfigResponse'),
+          '400': errorResponse('Invalid plugin id'),
+          '404': errorResponse('Plugin missing, disabled, or not public'),
+          '503': errorResponse('Invalid or unavailable policy configuration'),
+        },
+      },
+    },
     '/api/v1/plugin/check-permission': {
       get: {
         tags: ['Public Plugin API'],
@@ -256,6 +270,25 @@ export const openApiDocument = {
       },
     },
     schemas: {
+      PluginAccessConfigResponse: {
+        type: 'object',
+        required: ['code', 'message', 'data'],
+        properties: {
+          code: { type: 'integer', enum: [0] },
+          message: { type: 'string' },
+          data: {
+            type: 'object',
+            required: ['policy_version', 'id', 'enabled', 'access_scope'],
+            additionalProperties: false,
+            properties: {
+              policy_version: { type: 'integer', enum: [1] },
+              id: { type: 'string' },
+              enabled: { type: 'boolean', enum: [true] },
+              access_scope: { type: 'string', enum: ['root-only', 'admin-only', 'manager-only', 'auth-only'] },
+            },
+          },
+        },
+      },
       ErrorResponse: {
         type: 'object',
         required: ['code', 'message'],
