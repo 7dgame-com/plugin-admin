@@ -77,6 +77,7 @@ import { useI18n } from 'vue-i18n'
 import { Close, Fold, Grid, OfficeBuilding, User, Loading } from '@element-plus/icons-vue'
 import { useAuthSession } from '../composables/useAuthSession'
 import { getRuntimeMode, removeAllTokens } from '../utils/token'
+import { logoutSession } from '../api'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -89,6 +90,7 @@ const showNavigation = computed(() => ready.value && isRootUser.value)
 const showNoPermission = computed(() => ready.value && !isRootUser.value)
 
 async function handleLogout() {
+  try { await logoutSession() } catch { /* Local logout still completes when revocation is unavailable. */ }
   removeAllTokens()
 
   if (getRuntimeMode() === 'embedded') {

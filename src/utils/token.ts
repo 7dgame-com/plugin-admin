@@ -1,5 +1,19 @@
 const TOKEN_KEY = 'system-admin-token'
 const REFRESH_TOKEN_KEY = 'system-admin-refresh-token'
+const EPOCH_KEY = 'system-admin-session-epoch'
+export function getSessionEpoch(): string {
+  return localStorage.getItem(EPOCH_KEY) || 'initial'
+}
+export function beginSession(): void {
+  localStorage.setItem(EPOCH_KEY, crypto.randomUUID())
+}
+export async function withTokenRefreshLock<T>(
+  action: () => Promise<T>
+): Promise<T> {
+  return navigator.locks
+    ? navigator.locks.request('system-admin-refresh', action)
+    : action()
+}
 
 export type RuntimeMode = 'embedded' | 'standalone'
 
@@ -21,6 +35,18 @@ export function getToken(): string | null {
 }
 
 export function setToken(token: string) {
+  const actor = (value: string | null): string | null => {
+    try {
+      const body = JSON.parse(
+        atob((value || '').split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))
+      )
+      return String(body.uid ?? body.sub ?? '') || null
+    } catch {
+      return null
+    }
+  }
+  const current = getToken()
+  if (!current || actor(current) !== actor(token)) beginSession()
   localStorage.setItem(TOKEN_KEY, token)
 }
 
@@ -41,6 +67,7 @@ export function removeRefreshToken(): void {
 }
 
 export function removeAllTokens() {
+  beginSession()
   removeToken()
   removeRefreshToken()
 }
@@ -51,9 +78,7 @@ export function removeAllTokens() {
 export function requestParentTokenRefresh(): Promise<{
   accessToken: string
 } | null> {
-  const timeout = Number(
-    import.meta.env.VITE_IFRAME_REFRESH_TIMEOUT
-  ) || 3000
+  const timeout = Number(import.meta.env.VITE_IFRAME_REFRESH_TIMEOUT) || 3000
 
   return new Promise((resolve) => {
     let settled = false
@@ -80,7 +105,10 @@ export function requestParentTokenRefresh(): Promise<{
 
     window.addEventListener('message', onMessage)
     window.parent.postMessage(
-      { type: 'TOKEN_REFRESH_REQUEST', id: `token-refresh-request-${Date.now()}` },
+      {
+        type: 'TOKEN_REFRESH_REQUEST',
+        id: `token-refresh-request-${Date.now()}`
+      },
       '*'
     )
   })

@@ -234,7 +234,7 @@ describe('Property 6: 两段式 token 刷新顺序', () => {
       expect(response.data).toEqual({ ok: true })
       expect(authPostSpy).toHaveBeenCalledWith('/refresh', {
         refreshToken: 'refresh-1',
-      })
+      }, expect.objectContaining({ headers: { 'Idempotency-Key': expect.any(String) }, timeout: 5000 }))
       expect(localStorage.getItem('system-admin-token')).toBe('new-access-token')
       expect(localStorage.getItem('system-admin-refresh-token')).toBe('refresh-2')
     } finally {
@@ -314,7 +314,7 @@ describe('Property 7: 双段刷新失败触发 TOKEN_EXPIRED', () => {
       await expect(adminApi.get('/test')).rejects.toBeTruthy()
       expect(authPostSpy).toHaveBeenCalledWith('/refresh', {
         refreshToken: 'refresh-1',
-      })
+      }, expect.objectContaining({ headers: { 'Idempotency-Key': expect.any(String) }, timeout: 5000 }))
       expect(removeAllTokensSpy).toHaveBeenCalled()
       expect(postMessageSpy).not.toHaveBeenCalledWith({ type: 'TOKEN_EXPIRED' }, '*')
     } finally {

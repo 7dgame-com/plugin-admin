@@ -9,6 +9,9 @@ const { replace, fetchSession, removeAllTokens } = vi.hoisted(() => ({
   removeAllTokens: vi.fn(),
 }))
 
+const revoke = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
+vi.mock('../api', () => ({ logoutSession: revoke }))
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ replace }),
 }))
@@ -44,6 +47,7 @@ describe('AppLayout', () => {
     replace.mockReset()
     fetchSession.mockReset()
     removeAllTokens.mockReset()
+    revoke.mockClear()
     authSessionState.user.value = { username: 'root', nickname: 'Root', roles: ['root'] }
     authSessionState.isRootUser.value = true
   })
@@ -77,6 +81,7 @@ describe('AppLayout', () => {
     await wrapper.get('[data-testid="logout-button"]').trigger('click')
 
     expect(removeAllTokens).toHaveBeenCalled()
+    expect(revoke).toHaveBeenCalledOnce()
     expect(fetchSession).toHaveBeenCalledTimes(1)
     expect(replace).toHaveBeenCalledWith({ name: 'Login' })
   })

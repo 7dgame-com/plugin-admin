@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { isIdentityEnabled } from '../utils/authProvider'
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import {
   getRuntimeMode,
@@ -7,7 +8,9 @@ import {
   removeAllTokens,
   requestParentTokenRefresh,
   getRefreshToken,
-  setRefreshToken
+  setRefreshToken,
+  getSessionEpoch,
+  withTokenRefreshLock
 } from '../utils/token'
 
 /**
@@ -30,7 +33,7 @@ export const pluginApi = axios.create({
  * 主平台认证接口（指向主平台 /api/v1/auth）
  */
 export const authApi = axios.create({
-  baseURL: '/api/v1/auth',
+  baseURL: isIdentityEnabled() ? '/api-auth/v1/auth' : '/api/v1/auth',
   timeout: 10000
 })
 
@@ -62,8 +65,10 @@ function processQueue(error: Error | null, token: string | null) {
 }
 
 async function tryRefreshToken(): Promise<string | null> {
+  const epoch = getSessionEpoch()
   if (getRuntimeMode() === 'embedded') {
     const result = await requestParentTokenRefresh()
+    if (epoch !== getSessionEpoch()) throw Object.assign(new Error('Session changed'), { code: 'SESSION_SUPERSEDED' })
     if (result?.accessToken) {
       setToken(result.accessToken)
       return result.accessToken
@@ -74,8 +79,26 @@ async function tryRefreshToken(): Promise<string | null> {
   const refreshToken = getRefreshToken()
   if (!refreshToken) return null
 
-  try {
-    const res = await authApi.post('/refresh', { refreshToken })
+  return withTokenRefreshLock(async () => {
+    if (epoch !== getSessionEpoch()) throw Object.assign(new Error('Session changed'), { code: 'SESSION_SUPERSEDED' })
+    if (getRefreshToken() !== refreshToken) return getToken()
+    const config = {
+      headers: { 'Idempotency-Key': crypto.randomUUID() }, timeout: 5000,
+    }
+    let res
+    for (let attempt = 0; ; attempt++) {
+      if (epoch !== getSessionEpoch()) throw Object.assign(new Error('Session changed'), { code: 'SESSION_SUPERSEDED' })
+      try {
+        res = await authApi.post('/refresh', { refreshToken }, config)
+        break
+      } catch (error) {
+        const status = (error as AxiosError).response?.status
+        const transient = status ? [429, 502, 503, 504].includes(status) : (error as AxiosError).isAxiosError
+        if (attempt >= 1 || !transient) throw error
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+    }
+    if (epoch !== getSessionEpoch()) throw Object.assign(new Error('Session changed'), { code: 'SESSION_SUPERSEDED' })
     const tokenPayload = res.data?.token
     const accessToken = tokenPayload?.accessToken
 
@@ -90,9 +113,7 @@ async function tryRefreshToken(): Promise<string | null> {
     }
 
     return accessToken
-  } catch {
-    return null
-  }
+  })
 }
 
 async function getRequestToken(): Promise<string | null> {
@@ -104,8 +125,10 @@ async function getRequestToken(): Promise<string | null> {
   }
 
   if (!bootstrapTokenPromise) {
+    const epoch = getSessionEpoch()
     bootstrapTokenPromise = requestParentTokenRefresh()
       .then((result) => {
+        if (epoch !== getSessionEpoch()) throw Object.assign(new Error('Session changed'), { code: 'SESSION_SUPERSEDED' })
         const accessToken = result?.accessToken ?? getToken()
         if (accessToken) {
           setToken(accessToken)
@@ -126,7 +149,12 @@ async function getRequestToken(): Promise<string | null> {
 function setupInterceptors(instance: ReturnType<typeof axios.create>) {
   // Request: 注入 Authorization header
   instance.interceptors.request.use(async (config) => {
+    const sessionRequest = config as typeof config & { _sessionEpoch?: string }
+    const epoch = getSessionEpoch()
+    const previousToken = getToken()
     const token = await getRequestToken()
+    if (epoch !== getSessionEpoch() && previousToken) throw Object.assign(new Error('Session changed'), { code: 'SESSION_SUPERSEDED' })
+    sessionRequest._sessionEpoch ??= getSessionEpoch()
     if (token) config.headers.Authorization = `Bearer ${token}`
     return config
   })
@@ -135,22 +163,28 @@ function setupInterceptors(instance: ReturnType<typeof axios.create>) {
   instance.interceptors.response.use(
     (res) => {
       const rt = res.headers['x-refresh-token']
-      if (rt) setRefreshToken(rt)
+      const epoch = (res.config as typeof res.config & { _sessionEpoch?: string })._sessionEpoch
+      if (rt && (!epoch || epoch === getSessionEpoch())) setRefreshToken(rt)
       return res
     },
     async (err: AxiosError) => {
       const originalRequest = err.config as InternalAxiosRequestConfig & {
         _retry?: boolean
+        _sessionEpoch?: string
       }
 
-      if (err.response?.status !== 401 || originalRequest._retry) {
+      if (err.response?.status !== 401 || originalRequest._retry || ['/login', '/refresh', '/logout'].includes(originalRequest.url || '')) {
         return Promise.reject(err)
       }
+      if (originalRequest._sessionEpoch && originalRequest._sessionEpoch !== getSessionEpoch()) return Promise.reject(err)
+      const method = (originalRequest.method || 'get').toLowerCase()
+      const canReplay = ['get', 'head', 'options'].includes(method) || Boolean(originalRequest.headers['Idempotency-Key'] || originalRequest.headers['X-Idempotency-Key'])
 
       if (isRefreshing) {
         return new Promise<string>((resolve, reject) => {
           failedQueue.push({ resolve, reject })
         }).then((newToken) => {
+          if (!canReplay) return Promise.reject(err)
           originalRequest.headers.Authorization = `Bearer ${newToken}`
           originalRequest._retry = true
           return instance(originalRequest)
@@ -168,11 +202,17 @@ function setupInterceptors(instance: ReturnType<typeof axios.create>) {
         }
 
         processQueue(null, newToken)
+        if (!canReplay) return Promise.reject(err)
 
         originalRequest.headers = originalRequest.headers ?? {}
         originalRequest.headers.Authorization = `Bearer ${newToken}`
         return instance(originalRequest)
       } catch (refreshError) {
+        const status = (refreshError as AxiosError)?.response?.status
+        if ((refreshError as AxiosError)?.code === 'SESSION_SUPERSEDED' || status !== undefined && status !== 401 && status !== 403 || (refreshError as AxiosError)?.isAxiosError && !status) {
+          processQueue(refreshError instanceof Error ? refreshError : new Error('Authentication is temporarily unavailable'), null)
+          return Promise.reject(refreshError)
+        }
         removeAllTokens()
 
         if (getRuntimeMode() === 'embedded') {
@@ -219,3 +259,13 @@ export const getOrganizations = () => mainApi.get('/organization/list')
 
 export const verifyToken = () =>
   mainApi.get('/plugin/verify-token')
+
+export async function logoutSession(): Promise<void> {
+  const accessToken = getToken()
+  const refreshToken = getRefreshToken()
+  removeAllTokens()
+  if (!accessToken && !refreshToken) return
+  await authApi.post('/logout', { refreshToken }, {
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+  })
+}

@@ -48,6 +48,9 @@ usePluginMessageBridge({
     if (newToken) {
       setToken(newToken)
       hasToken.value = true
+    } else {
+      removeAllTokens()
+      hasToken.value = false
     }
   },
   onDestroy: () => {

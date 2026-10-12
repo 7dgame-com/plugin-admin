@@ -38,7 +38,7 @@ import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { authApi, verifyToken } from '../api'
-import { removeAllTokens, setRefreshToken, setToken } from '../utils/token'
+import { beginSession, getSessionEpoch, removeAllTokens, setRefreshToken, setToken } from '../utils/token'
 
 const route = useRoute()
 const router = useRouter()
@@ -79,12 +79,15 @@ async function submit() {
   loading.value = true
   errorMessage.value = ''
 
+  beginSession()
+  let epoch = getSessionEpoch()
   try {
     const loginResponse = await authApi.post('/login', {
       username: form.username,
       password: form.password,
     })
     const tokenPayload = loginResponse.data?.token
+    if (epoch !== getSessionEpoch()) return
 
     if (!tokenPayload?.accessToken || !tokenPayload?.refreshToken) {
       throw new Error(t('auth.loginFailed'))
@@ -92,8 +95,10 @@ async function submit() {
 
     setToken(tokenPayload.accessToken)
     setRefreshToken(tokenPayload.refreshToken)
+    epoch = getSessionEpoch()
 
     const verifyResponse = await verifyToken()
+    if (epoch !== getSessionEpoch()) return
     const roles = verifyResponse.data?.data?.roles ?? []
 
     if (!Array.isArray(roles) || !roles.includes('root')) {
@@ -108,6 +113,7 @@ async function submit() {
 
     await router.replace(redirect)
   } catch (error) {
+    if (epoch !== getSessionEpoch()) return
     removeAllTokens()
     errorMessage.value = extractErrorMessage(error)
   } finally {
