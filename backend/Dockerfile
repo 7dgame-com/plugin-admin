@@ -2,9 +2,9 @@ FROM node:24-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json package-lock.json* tsconfig.json ./
+COPY package.json package-lock.json tsconfig.json ./
 
-RUN npm install
+RUN npm ci
 
 COPY src/ ./src/
 
@@ -18,13 +18,15 @@ ARG APP_VERSION=unknown
 ARG GIT_SHA=unknown
 ARG BUILD_TIME=unknown
 
+LABEL org.opencontainers.image.revision=$GIT_SHA
+
 ENV APP_VERSION=$APP_VERSION
 ENV GIT_SHA=$GIT_SHA
 ENV BUILD_TIME=$BUILD_TIME
 
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 
-RUN npm install --production
+RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
 

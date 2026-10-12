@@ -8,3 +8,6 @@ src/**/__tests__
 *.md
 .env*
 .vscode
+
+**/node_modules
+backend
